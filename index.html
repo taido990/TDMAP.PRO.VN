@@ -590,6 +590,10 @@ map.addControl(new LocateControl());
 
 map.setView([12.7, 108.2], 13);
 
+// Dùng Canvas renderer thay vì SVG mặc định: nhẹ hơn nhiều lần khi vẽ
+// hàng nghìn thửa (mỗi polygon SVG là 1 thẻ DOM riêng, Canvas thì không).
+const mapCanvasRenderer = L.canvas({ padding: 0.5 });
+
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let allParcels = [];
 let allLayers  = [];
@@ -645,48 +649,103 @@ function parseKML(xml) {
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
-function renderParcels(list) {
-  allLayers.forEach(l => map.removeLayer(l));
-  allLayers = [];
-  const bounds = [];
+// Render theo từng lô nhỏ (chunk) bằng requestAnimationFrame để nhường quyền
+// điều khiển cho trình duyệt giữa các lô -> tránh treo "Page Unresponsive"
+// kể cả với dữ liệu >3000 thửa.
+const RENDER_CHUNK_SIZE = 120;
 
-  list.forEach(p => {
-    if (!p.rings.length) return;
+// requestIdleCallback mượt hơn rAF khi rảnh, nhưng không phải trình duyệt nào
+// cũng hỗ trợ -> có fallback về rAF.
+const scheduleChunk = window.requestIdleCallback
+  ? (fn) => requestIdleCallback(fn, { timeout: 100 })
+  : (fn) => requestAnimationFrame(fn);
 
-    const poly = L.polygon(p.rings, {
-      color: '#ffff00', weight: 2.5,
-      fillColor: '#ffff00', fillOpacity: 0.06,
-      interactive: true, bubblingMouseEvents: false
-    }).addTo(map);
-
-    poly.on('click tap', () => openPopup(p));
-    bounds.push(...p.rings.flat());
-
-    const dot = L.circleMarker([p.lat, p.lon], {
-      radius: 5, color: '#fff', weight: 1.5,
-      fillColor: '#1a6fd4', fillOpacity: 1,
-      interactive: true, bubblingMouseEvents: false
-    }).addTo(map);
-    dot.on('click tap', () => openPopup(p));
-
-    const lbl = L.tooltip({
-      permanent: true, direction: 'center',
-      className: 'lbl-style', offset: [0, 0]
-    }).setContent(p.id);
-
-    function updateLabel() {
-      if (map.getZoom() >= 15) poly.bindTooltip(lbl);
-      else poly.unbindTooltip();
+// Chỉ bind tooltip (nhãn) cho các thửa đang nằm TRONG khung nhìn hiện tại,
+// thay vì bind tất cả 3000+ thửa cùng lúc. Việc này chạy lại mỗi khi
+// zoom/kéo bản đồ (moveend) nhưng chỉ xử lý phần đang hiển thị nên rất nhẹ.
+function updateAllLabels() {
+  const show = map.getZoom() >= 15;
+  if (!show) {
+    allParcels.forEach(p => { if (p._poly && p._lblBound) { p._poly.unbindTooltip(); p._lblBound = false; } });
+    return;
+  }
+  const viewBounds = map.getBounds();
+  allParcels.forEach(p => {
+    if (!p._poly || !p._lbl) return;
+    const inView = p.lat != null && p.lon != null && viewBounds.contains([p.lat, p.lon]);
+    if (inView && !p._lblBound) {
+      p._poly.bindTooltip(p._lbl);
+      p._lblBound = true;
+    } else if (!inView && p._lblBound) {
+      p._poly.unbindTooltip();
+      p._lblBound = false;
     }
-    map.on('zoomend', updateLabel);
-    updateLabel();
-
-    allLayers.push(poly, dot);
-    p._poly = poly;
-    p._dot  = dot;
   });
+}
+// Chỉ đăng ký DUY NHẤT MỘT listener cho toàn bộ map (zoomend + moveend),
+// thay vì mỗi thửa tự đăng ký 1 listener riêng (rất tốn bộ nhớ + CPU).
+map.on('zoomend moveend', updateAllLabels);
 
-  if (bounds.length) map.fitBounds(bounds, { padding: [60,60], maxZoom: 17 });
+function renderParcels(list) {
+  return new Promise(resolve => {
+    allLayers.forEach(l => map.removeLayer(l));
+    allLayers = [];
+    // Dùng L.latLngBounds().extend() thay vì gom mảng khổng lồ rồi spread
+    // (bounds.push(...array) có thể vượt giới hạn tham số của JS và làm
+    // trình duyệt treo cứng khi dữ liệu lớn).
+    const bounds = L.latLngBounds();
+    let i = 0;
+
+    function processChunk() {
+      const end = Math.min(i + RENDER_CHUNK_SIZE, list.length);
+
+      for (; i < end; i++) {
+        const p = list[i];
+        if (!p.rings.length) continue;
+
+        const poly = L.polygon(p.rings, {
+          renderer: mapCanvasRenderer,
+          color: '#ffff00', weight: 2.5,
+          fillColor: '#ffff00', fillOpacity: 0.06,
+          interactive: true, bubblingMouseEvents: false
+        }).addTo(map);
+
+        poly.on('click tap', () => openPopup(p));
+        for (const ring of p.rings) {
+          for (const pt of ring) bounds.extend(pt);
+        }
+
+        const dot = L.circleMarker([p.lat, p.lon], {
+          renderer: mapCanvasRenderer,
+          radius: 5, color: '#fff', weight: 1.5,
+          fillColor: '#1a6fd4', fillOpacity: 1,
+          interactive: true, bubblingMouseEvents: false
+        }).addTo(map);
+        dot.on('click tap', () => openPopup(p));
+
+        p._lbl = L.tooltip({
+          permanent: true, direction: 'center',
+          className: 'lbl-style', offset: [0, 0]
+        }).setContent(p.id);
+        p._lblBound = false;
+
+        allLayers.push(poly, dot);
+        p._poly = poly;
+        p._dot  = dot;
+      }
+
+      if (i < list.length) {
+        showStatus(`Đang tải ${i}/${list.length} thửa...`);
+        scheduleChunk(processChunk);
+      } else {
+        if (bounds.isValid()) map.fitBounds(bounds, { padding: [60,60], maxZoom: 17 });
+        updateAllLabels();
+        resolve();
+      }
+    }
+
+    processChunk();
+  });
 }
 
 // ── POPUP BẢN ĐỒ ──────────────────────────────────────────────────────────────
@@ -792,13 +851,99 @@ function executeSearch() {
   }
 }
 
+// ── PHÂN TÍCH KML TRONG WEB WORKER (không chặn giao diện) ──────────────────────
+// Với file lớn (>3000 thửa), DOMParser + querySelectorAll có thể mất 1-2s.
+// Chạy trong Worker để luồng chính (UI) không bị đứng trong lúc đó.
+// Nếu trình duyệt không hỗ trợ hoặc worker lỗi -> tự động rơi về phân tích
+// trên luồng chính (parseKML ở trên) để đảm bảo luôn hoạt động được.
+function getKmlWorkerURL() {
+  const workerSrc = `
+    self.onmessage = function(e) {
+      try {
+        self.postMessage({ ok: true, data: parseKML(e.data) });
+      } catch (err) {
+        self.postMessage({ ok: false, error: String(err) });
+      }
+    };
+    function parseKML(xml) {
+      const doc = new DOMParser().parseFromString(xml, 'text/xml');
+      const pms = Array.from(doc.querySelectorAll('Placemark'));
+      const byId = {};
+      pms.forEach(pm => {
+        const name = (pm.querySelector('name')||{}).textContent||'';
+        const idM = name.trim().match(/^(\\d+[-–]\\d+)/);
+        const id  = idM ? idM[1].replace('–','-') : null;
+        if (!id) return;
+        if (!byId[id]) byId[id] = { id, lat:null, lon:null, linkHSQ:'', rings:[] };
+        const p = byId[id];
+        pm.querySelectorAll('Polygon outerBoundaryIs LinearRing coordinates').forEach(el => {
+          const pts = el.textContent.trim().split(/\\s+/).map(s => {
+            const [lo, la] = s.split(',').map(Number);
+            return (!isNaN(la) && !isNaN(lo)) ? [la, lo] : null;
+          }).filter(Boolean);
+          if (pts.length > 2) p.rings.push(pts);
+        });
+        const ptEl = pm.querySelector('Point coordinates');
+        if (ptEl) {
+          const [lo, la] = ptEl.textContent.trim().split(',').map(Number);
+          if (!isNaN(la)) { p.lat = la; p.lon = lo; }
+          const desc = (pm.querySelector('description')||{}).textContent||'';
+          const m = (name+' '+desc).match(/https?:\\/\\/drive\\.google\\.com\\S+/);
+          if (m && !p.linkHSQ) p.linkHSQ = m[0].replace(/&/g,'&');
+        }
+      });
+      Object.values(byId).forEach(p => {
+        if (!p.lat && p.rings.length) {
+          const r = p.rings[0];
+          p.lat = r.reduce((s,c)=>s+c[0],0)/r.length;
+          p.lon = r.reduce((s,c)=>s+c[1],0)/r.length;
+        }
+      });
+      return Object.values(byId).filter(p => p.rings.length > 0 || p.lat)
+        .sort((a,b) => {
+          const [aT,aU] = a.id.split('-').map(Number);
+          const [bT,bU] = b.id.split('-').map(Number);
+          return aT!==bT ? aT-bT : aU-bU;
+        });
+    }
+  `;
+  return URL.createObjectURL(new Blob([workerSrc], { type: 'application/javascript' }));
+}
+
+function parseKMLAsync(xmlText) {
+  return new Promise(resolve => {
+    let settled = false;
+    const fallback = () => { if (!settled) { settled = true; resolve(parseKML(xmlText)); } };
+    try {
+      if (!window.Worker) return fallback();
+      const url = getKmlWorkerURL();
+      const worker = new Worker(url);
+      const timeout = setTimeout(() => { worker.terminate(); URL.revokeObjectURL(url); fallback(); }, 20000);
+      worker.onmessage = (e) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        worker.terminate();
+        URL.revokeObjectURL(url);
+        if (e.data && e.data.ok) resolve(e.data.data);
+        else resolve(parseKML(xmlText));
+      };
+      worker.onerror = () => { clearTimeout(timeout); worker.terminate(); URL.revokeObjectURL(url); fallback(); };
+      worker.postMessage(xmlText);
+    } catch (err) {
+      fallback();
+    }
+  });
+}
+
 // ── FILE ──────────────────────────────────────────────────────────────────────
 function handleFile(file) {
   if (!file) return;
   const r = new FileReader();
-  r.onload = e => {
-    allParcels = parseKML(e.target.result);
-    renderParcels(allParcels);
+  r.onload = async e => {
+    showStatus('Đang phân tích dữ liệu KML...');
+    allParcels = await parseKMLAsync(e.target.result);
+    await renderParcels(allParcels);
     document.getElementById('splash').style.display = 'none';
     document.getElementById('logoWrap').style.display = 'block';
     showStatus(`✓ ${allParcels.length} thửa – ${file.name}`);
