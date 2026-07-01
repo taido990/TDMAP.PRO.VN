@@ -598,18 +598,46 @@ const mapCanvasRenderer = L.canvas({ padding: 0.5 });
 let allParcels = [];
 let allLayers  = [];
 let activeP    = null;
+let ranhThonLayers = [];
 
 // ── KML PARSER ────────────────────────────────────────────────────────────────
+// Trả về { parcels, ranhThon: { lines, labels } }
+// - parcels: các thửa đất (Polygon + Point có tên dạng "Tờ-Thửa")
+// - ranhThon.lines: các đoạn LineString ranh giới thôn/tổ dân phố
+// - ranhThon.labels: các Point có tên KHÔNG theo mẫu Tờ-Thửa (vd "TDP 8B")
 function parseKML(xml) {
   const doc = new DOMParser().parseFromString(xml, 'text/xml');
   const pms = Array.from(doc.querySelectorAll('Placemark'));
   const byId = {};
+  const thonLines = [];
+  const thonLabels = [];
 
   pms.forEach(pm => {
+    // Ranh thôn: bất kỳ Placemark nào có LineString (không phải thửa đất)
+    const lineEl = pm.querySelector('LineString coordinates');
+    if (lineEl) {
+      const pts = lineEl.textContent.trim().split(/\s+/).map(s => {
+        const [lo, la] = s.split(',').map(Number);
+        return (!isNaN(la) && !isNaN(lo)) ? [la, lo] : null;
+      }).filter(Boolean);
+      if (pts.length > 1) thonLines.push(pts);
+      return;
+    }
+
     const name = (pm.querySelector('name')||{}).textContent||'';
     const idM = name.trim().match(/^(\d+[-–]\d+)/);
     const id  = idM ? idM[1].replace('–','-') : null;
-    if (!id) return;
+
+    // Nhãn ranh thôn: Point có tên nhưng KHÔNG theo mẫu số Tờ-Thửa
+    if (!id) {
+      const ptEl2 = pm.querySelector('Point coordinates');
+      const nm = name.trim();
+      if (ptEl2 && nm) {
+        const [lo, la] = ptEl2.textContent.trim().split(',').map(Number);
+        if (!isNaN(la) && !isNaN(lo)) thonLabels.push({ lat: la, lon: lo, name: nm });
+      }
+      return;
+    }
 
     if (!byId[id]) byId[id] = { id, lat:null, lon:null, linkHSQ:'', rings:[] };
     const p = byId[id];
@@ -640,12 +668,14 @@ function parseKML(xml) {
     }
   });
 
-  return Object.values(byId).filter(p => p.rings.length > 0 || p.lat)
+  const parcels = Object.values(byId).filter(p => p.rings.length > 0 || p.lat)
     .sort((a,b) => {
       const [aT,aU] = a.id.split('-').map(Number);
       const [bT,bU] = b.id.split('-').map(Number);
       return aT!==bT ? aT-bT : aU-bU;
     });
+
+  return { parcels, ranhThon: { lines: thonLines, labels: thonLabels } };
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
@@ -745,6 +775,34 @@ function renderParcels(list) {
     }
 
     processChunk();
+  });
+}
+
+// ── RANH THÔN (ranh giới thôn/tổ dân phố) ───────────────────────────────────────
+// Vẽ đường ranh màu đỏ + nhãn tên thôn màu xanh lá, tách riêng khỏi lớp thửa đất.
+function renderRanhThon(ranhThon) {
+  ranhThonLayers.forEach(l => map.removeLayer(l));
+  ranhThonLayers = [];
+  if (!ranhThon) return;
+
+  (ranhThon.lines || []).forEach(pts => {
+    if (pts.length < 2) return;
+    const line = L.polyline(pts, {
+      renderer: mapCanvasRenderer,
+      color: '#ff0000', weight: 3, opacity: 0.9,
+      interactive: false
+    }).addTo(map);
+    ranhThonLayers.push(line);
+  });
+
+  (ranhThon.labels || []).forEach(lb => {
+    if (lb.lat == null || lb.lon == null) return;
+    const marker = L.marker([lb.lat, lb.lon], {
+      icon: L.divIcon({ className: 'thon-lbl-style', html: lb.name, iconSize: null }),
+      interactive: false,
+      keyboard: false
+    }).addTo(map);
+    ranhThonLayers.push(marker);
   });
 }
 
@@ -869,11 +927,30 @@ function getKmlWorkerURL() {
       const doc = new DOMParser().parseFromString(xml, 'text/xml');
       const pms = Array.from(doc.querySelectorAll('Placemark'));
       const byId = {};
+      const thonLines = [];
+      const thonLabels = [];
       pms.forEach(pm => {
+        const lineEl = pm.querySelector('LineString coordinates');
+        if (lineEl) {
+          const pts = lineEl.textContent.trim().split(/\\s+/).map(s => {
+            const [lo, la] = s.split(',').map(Number);
+            return (!isNaN(la) && !isNaN(lo)) ? [la, lo] : null;
+          }).filter(Boolean);
+          if (pts.length > 1) thonLines.push(pts);
+          return;
+        }
         const name = (pm.querySelector('name')||{}).textContent||'';
         const idM = name.trim().match(/^(\\d+[-–]\\d+)/);
         const id  = idM ? idM[1].replace('–','-') : null;
-        if (!id) return;
+        if (!id) {
+          const ptEl2 = pm.querySelector('Point coordinates');
+          const nm = name.trim();
+          if (ptEl2 && nm) {
+            const [lo, la] = ptEl2.textContent.trim().split(',').map(Number);
+            if (!isNaN(la) && !isNaN(lo)) thonLabels.push({ lat: la, lon: lo, name: nm });
+          }
+          return;
+        }
         if (!byId[id]) byId[id] = { id, lat:null, lon:null, linkHSQ:'', rings:[] };
         const p = byId[id];
         pm.querySelectorAll('Polygon outerBoundaryIs LinearRing coordinates').forEach(el => {
@@ -899,12 +976,13 @@ function getKmlWorkerURL() {
           p.lon = r.reduce((s,c)=>s+c[1],0)/r.length;
         }
       });
-      return Object.values(byId).filter(p => p.rings.length > 0 || p.lat)
+      const parcels = Object.values(byId).filter(p => p.rings.length > 0 || p.lat)
         .sort((a,b) => {
           const [aT,aU] = a.id.split('-').map(Number);
           const [bT,bU] = b.id.split('-').map(Number);
           return aT!==bT ? aT-bT : aU-bU;
         });
+      return { parcels, ranhThon: { lines: thonLines, labels: thonLabels } };
     }
   `;
   return URL.createObjectURL(new Blob([workerSrc], { type: 'application/javascript' }));
@@ -942,11 +1020,15 @@ function handleFile(file) {
   const r = new FileReader();
   r.onload = async e => {
     showStatus('Đang phân tích dữ liệu KML...');
-    allParcels = await parseKMLAsync(e.target.result);
+    const result = await parseKMLAsync(e.target.result);
+    allParcels = result.parcels;
     await renderParcels(allParcels);
+    renderRanhThon(result.ranhThon);
     document.getElementById('splash').style.display = 'none';
     document.getElementById('logoWrap').style.display = 'block';
-    showStatus(`✓ ${allParcels.length} thửa – ${file.name}`);
+    const soThonLines = (result.ranhThon && result.ranhThon.lines) ? result.ranhThon.lines.length : 0;
+    const thonNote = soThonLines > 0 ? ` (kèm ranh thôn)` : '';
+    showStatus(`✓ ${allParcels.length} thửa${thonNote} – ${file.name}`);
   };
   r.readAsText(file, 'UTF-8');
 }
@@ -980,7 +1062,17 @@ s.textContent = `.lbl-style {
   text-shadow: none;
   pointer-events: none;
 }
-.lbl-style::before { display: none !important; }`;
+.lbl-style::before { display: none !important; }
+.thon-lbl-style {
+  color: #00cc44 !important;
+  font-size: 12px; font-weight: 800;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,0.9);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  background: transparent !important;
+  border: none !important;
+}`;
 document.head.appendChild(s);
 </script>
 </body>
