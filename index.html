@@ -78,6 +78,29 @@
     white-space: nowrap; pointer-events: none; transition: opacity .4s;
   }
 
+  /* BADGE MỨC ZOOM */
+  #zoomBadge {
+    position: fixed; top: 66px; left: 15px;
+    z-index: 1001; display: flex; align-items: center; gap: 6px;
+    background: rgba(10,18,28,0.9);
+    border: 1px solid rgba(0,198,167,0.5); border-radius: 20px;
+    padding: 6px 14px; font-size: 11px; font-weight: 700;
+    color: #00c6a7; white-space: nowrap; pointer-events: none;
+    max-width: calc(100vw - 30px); overflow: hidden; text-overflow: ellipsis;
+    transition: background .25s, border-color .25s, color .25s;
+  }
+  #zoomBadge .zb-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #00c6a7;
+    box-shadow: 0 0 6px rgba(0,198,167,.8);
+    transition: background .25s, box-shadow .25s;
+  }
+  #zoomBadge.below-threshold {
+    border-color: rgba(255,180,0,0.55); color: #ffc107;
+  }
+  #zoomBadge.below-threshold .zb-dot {
+    background: #ffc107; box-shadow: 0 0 6px rgba(255,193,7,.8);
+  }
+
   /* POPUP BẢN ĐỒ */
   #popup {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 500;
@@ -258,8 +281,8 @@
 <div id="splash">
   <div class="brand">TDMAP.PRO.VN</div>
   <div class="circle" onclick="document.getElementById('fileInput').click()">📂</div>
-  <h2>Tải file KML lên</h2>
-  <p>Chọn file .kml xuất từ QGIS script TDMAP<br>để xem ranh thửa trên ảnh vệ tinh</p>
+  <h2>Tải file bản đồ lên</h2>
+  <p>Chọn file .kml hoặc .geojson xuất từ QGIS script TDMAP<br>để xem ranh thửa trên ảnh vệ tinh</p>
 </div>
 
 <div id="map"></div>
@@ -278,11 +301,12 @@
   <div class="divider"></div>
   <input id="searchInput" type="search" placeholder="Nhập Tờ-Thửa (vd: 31-27)..." oninput="onInputSearch()" onkeydown="if(event.key==='Enter') executeSearch()">
   <button id="searchBtn" onclick="executeSearch()" title="Tìm kiếm thửa đất">🔍</button>
-  <button id="loadBtn" onclick="document.getElementById('fileInput').click()">📂 Mở KML</button>
+  <button id="loadBtn" onclick="document.getElementById('fileInput').click()">📂 Mở file</button>
 </div>
-<input type="file" id="fileInput" accept=".kml,.xml" onchange="handleFile(this.files[0])">
+<input type="file" id="fileInput" accept=".kml,.xml,.geojson,.json" onchange="handleFile(this.files[0])">
 
 <div id="statusPill" style="opacity:0">–</div>
+<div id="zoomBadge"><span class="zb-dot"></span><span id="zoomBadgeText">Zoom 13</span></div>
 
 <div id="popup">
   <div id="popupHandle"></div>
@@ -339,7 +363,7 @@
   </div>
 </div>
 
-<div id="dropOverlay"><p>📂<br>Thả file KML vào đây</p></div>
+<div id="dropOverlay"><p>📂<br>Thả file KML/GeoJSON vào đây</p></div>
 
 <button id="locateBtn" title="Vị trí của tôi" onclick="locateMe()">📍</button>
 
@@ -678,7 +702,101 @@ function parseKML(xml) {
   return { parcels, ranhThon: { lines: thonLines, labels: thonLabels } };
 }
 
-// ── RENDER ────────────────────────────────────────────────────────────────────
+// ── GEOJSON PARSER ────────────────────────────────────────────────────────────
+// Đọc file .geojson do QGIS script TDMAP xuất ra (cấu trúc tương đương KML):
+// - Thửa đất: 2 Feature/thửa — Polygon/MultiPolygon (ranh) + Point (nhãn),
+//   nhận diện qua thuộc tính 'khoa' (Tờ-Thửa), gộp lại theo cùng 'khoa'.
+// - Ranh thôn: Feature LineString/MultiLineString có properties.loai = 'ranh_thon'.
+// - Nhãn tên thôn: Feature Point có properties.loai = 'nhan_thon' (tên ở 'ten_thon').
+// Trả về cùng cấu trúc { parcels, ranhThon: { lines, labels } } như parseKML.
+function parseGeoJSON(text) {
+  const gj = typeof text === 'string' ? JSON.parse(text) : text;
+  const feats = (gj && gj.features) || [];
+  const byId = {};
+  const thonLines = [];
+  const thonLabels = [];
+
+  // GeoJSON dùng thứ tự [lon, lat] -> Leaflet cần [lat, lon]
+  const toLatLngRing = (ring) => ring.map(c => [c[1], c[0]]);
+
+  feats.forEach(f => {
+    const props = (f && f.properties) || {};
+    const geom = f && f.geometry;
+    if (!geom) return;
+
+    // --- Ranh thôn (đường) ---
+    if (props.loai === 'ranh_thon') {
+      if (geom.type === 'LineString') {
+        const pts = toLatLngRing(geom.coordinates || []);
+        if (pts.length > 1) thonLines.push(pts);
+      } else if (geom.type === 'MultiLineString') {
+        (geom.coordinates || []).forEach(line => {
+          const pts = toLatLngRing(line || []);
+          if (pts.length > 1) thonLines.push(pts);
+        });
+      }
+      return;
+    }
+
+    // --- Nhãn tên thôn (điểm) ---
+    if (props.loai === 'nhan_thon') {
+      if (geom.type === 'Point') {
+        const [lo, la] = geom.coordinates || [];
+        if (!isNaN(la) && !isNaN(lo)) {
+          thonLabels.push({ lat: la, lon: lo, name: props.ten_thon || '' });
+        }
+      }
+      return;
+    }
+
+    // --- Thửa đất: nhận diện qua thuộc tính 'khoa', dự phòng bằng 'label' ---
+    let id = (props.khoa != null && props.khoa !== '') ? String(props.khoa) : null;
+    if (!id && props.label) {
+      const m = String(props.label).match(/^(\d+[-–]\d+)/);
+      if (m) id = m[1];
+    }
+    if (!id) return;
+    id = id.replace('–', '-');
+
+    if (!byId[id]) byId[id] = { id, lat: null, lon: null, linkHSQ: '', rings: [] };
+    const p = byId[id];
+
+    if (geom.type === 'Polygon') {
+      (geom.coordinates || []).forEach(ring => {
+        const pts = toLatLngRing(ring || []);
+        if (pts.length > 2) p.rings.push(pts);
+      });
+    } else if (geom.type === 'MultiPolygon') {
+      (geom.coordinates || []).forEach(poly => {
+        (poly || []).forEach(ring => {
+          const pts = toLatLngRing(ring || []);
+          if (pts.length > 2) p.rings.push(pts);
+        });
+      });
+    } else if (geom.type === 'Point') {
+      const [lo, la] = geom.coordinates || [];
+      if (!isNaN(la)) { p.lat = la; p.lon = lo; }
+      if (props.linkHSQ && !p.linkHSQ) p.linkHSQ = props.linkHSQ;
+    }
+  });
+
+  Object.values(byId).forEach(p => {
+    if (!p.lat && p.rings.length) {
+      const r = p.rings[0];
+      p.lat = r.reduce((s,c)=>s+c[0],0)/r.length;
+      p.lon = r.reduce((s,c)=>s+c[1],0)/r.length;
+    }
+  });
+
+  const parcels = Object.values(byId).filter(p => p.rings.length > 0 || p.lat)
+    .sort((a,b) => {
+      const [aT,aU] = a.id.split('-').map(Number);
+      const [bT,bU] = b.id.split('-').map(Number);
+      return aT!==bT ? aT-bT : aU-bU;
+    });
+
+  return { parcels, ranhThon: { lines: thonLines, labels: thonLabels } };
+}
 // Render theo từng lô nhỏ (chunk) bằng requestAnimationFrame để nhường quyền
 // điều khiển cho trình duyệt giữa các lô -> tránh treo "Page Unresponsive"
 // kể cả với dữ liệu >3000 thửa.
@@ -690,31 +808,57 @@ const scheduleChunk = window.requestIdleCallback
   ? (fn) => requestIdleCallback(fn, { timeout: 100 })
   : (fn) => requestAnimationFrame(fn);
 
-// Chỉ bind tooltip (nhãn) cho các thửa đang nằm TRONG khung nhìn hiện tại,
-// thay vì bind tất cả 3000+ thửa cùng lúc. Việc này chạy lại mỗi khi
-// zoom/kéo bản đồ (moveend) nhưng chỉ xử lý phần đang hiển thị nên rất nhẹ.
+// Chỉ hiện nhãn (tooltip) VÀ chấm điểm giữa thửa khi zoom đủ lớn, đồng thời
+// chỉ bind/add cho các thửa đang nằm TRONG khung nhìn hiện tại (không phải
+// toàn bộ 3000+ thửa cùng lúc). Việc này chạy lại mỗi khi zoom/kéo bản đồ
+// (moveend) nhưng chỉ xử lý phần đang hiển thị nên rất nhẹ. Ranh thửa (polygon)
+// luôn hiển thị ở mọi mức zoom, chỉ nhãn + chấm điểm bị ẩn khi zoom nhỏ.
+const LABEL_MIN_ZOOM = 18; // Chỉ hiện nhãn + chấm điểm khi zoom >= mức này
 function updateAllLabels() {
-  const show = map.getZoom() >= 15;
+  const show = map.getZoom() >= LABEL_MIN_ZOOM;
   if (!show) {
-    allParcels.forEach(p => { if (p._poly && p._lblBound) { p._poly.unbindTooltip(); p._lblBound = false; } });
+    allParcels.forEach(p => {
+      if (p._poly && p._lblBound) { p._poly.unbindTooltip(); p._lblBound = false; }
+      if (p._dot && p._dotAdded) { map.removeLayer(p._dot); p._dotAdded = false; }
+    });
     return;
   }
   const viewBounds = map.getBounds();
   allParcels.forEach(p => {
     if (!p._poly || !p._lbl) return;
     const inView = p.lat != null && p.lon != null && viewBounds.contains([p.lat, p.lon]);
-    if (inView && !p._lblBound) {
-      p._poly.bindTooltip(p._lbl);
-      p._lblBound = true;
-    } else if (!inView && p._lblBound) {
-      p._poly.unbindTooltip();
-      p._lblBound = false;
+    if (inView) {
+      if (!p._lblBound) { p._poly.bindTooltip(p._lbl); p._lblBound = true; }
+      if (p._dot && !p._dotAdded) { p._dot.addTo(map); p._dotAdded = true; }
+    } else {
+      if (p._lblBound) { p._poly.unbindTooltip(); p._lblBound = false; }
+      if (p._dot && p._dotAdded) { map.removeLayer(p._dot); p._dotAdded = false; }
     }
   });
 }
+
+// Báo mức zoom hiện tại lên badge góc trên-trái (luôn hiển thị cố định,
+// không tự ẩn), đổi màu khi dưới ngưỡng hiện nhãn/chấm điểm (LABEL_MIN_ZOOM)
+// để người dùng biết cần zoom thêm bao nhiêu.
+function updateZoomBadge() {
+  const z = map.getZoom();
+  const el = document.getElementById('zoomBadge');
+  const txt = document.getElementById('zoomBadgeText');
+  const below = z < LABEL_MIN_ZOOM;
+  txt.textContent = below
+    ? `Zoom ${z} · cần ≥${LABEL_MIN_ZOOM} để hiện nhãn/điểm`
+    : `Zoom ${z} · đang hiện nhãn/điểm`;
+  el.classList.toggle('below-threshold', below);
+}
 // Chỉ đăng ký DUY NHẤT MỘT listener cho toàn bộ map (zoomend + moveend),
 // thay vì mỗi thửa tự đăng ký 1 listener riêng (rất tốn bộ nhớ + CPU).
-map.on('zoomend moveend', updateAllLabels);
+// Badge zoom cập nhật realtime ngay cả trong lúc đang phóng to/thu nhỏ
+// (sự kiện 'zoom' bắn liên tục trong animation), còn việc hiện/ẩn nhãn +
+// chấm điểm (tốn nhiều tài nguyên hơn) chỉ xử lý khi zoom đã dừng hẳn
+// ('zoomend'/'moveend') để tránh giật lag khi đang kéo/zoom.
+map.on('zoom', updateZoomBadge);
+map.on('zoomend moveend', () => { updateAllLabels(); updateZoomBadge(); });
+updateZoomBadge();
 
 function renderParcels(list) {
   return new Promise(resolve => {
@@ -750,7 +894,7 @@ function renderParcels(list) {
           radius: 5, color: '#fff', weight: 1.5,
           fillColor: '#1a6fd4', fillOpacity: 1,
           interactive: true, bubblingMouseEvents: false
-        }).addTo(map);
+        });
         dot.on('click tap', () => openPopup(p));
 
         p._lbl = L.tooltip({
@@ -758,6 +902,7 @@ function renderParcels(list) {
           className: 'lbl-style', offset: [0, 0]
         }).setContent(p.id);
         p._lblBound = false;
+        p._dotAdded = false; // Chấm điểm chỉ được addTo(map) khi zoom đủ lớn (xem updateAllLabels)
 
         allLayers.push(poly, dot);
         p._poly = poly;
@@ -879,7 +1024,7 @@ function executeSearch() {
   
   // Kiểm tra xem đã load dữ liệu chưa
   if (allParcels.length === 0) {
-    showAlert("Bạn chưa tải dữ liệu KML lên bản đồ.\nVui lòng nhấn nút 'Mở KML' để tải dữ liệu trước khi tìm kiếm!");
+    showAlert("Bạn chưa tải dữ liệu lên bản đồ.\nVui lòng nhấn nút 'Mở file' để tải dữ liệu (KML hoặc GeoJSON) trước khi tìm kiếm!");
     return;
   }
 
@@ -1014,13 +1159,150 @@ function parseKMLAsync(xmlText) {
   });
 }
 
+// ── PHÂN TÍCH GEOJSON TRONG WEB WORKER (tương tự KML) ──────────────────────────
+function getGeoJsonWorkerURL() {
+  const workerSrc = `
+    self.onmessage = function(e) {
+      try {
+        self.postMessage({ ok: true, data: parseGeoJSON(e.data) });
+      } catch (err) {
+        self.postMessage({ ok: false, error: String(err) });
+      }
+    };
+    function parseGeoJSON(text) {
+      const gj = typeof text === 'string' ? JSON.parse(text) : text;
+      const feats = (gj && gj.features) || [];
+      const byId = {};
+      const thonLines = [];
+      const thonLabels = [];
+      const toLatLngRing = (ring) => ring.map(c => [c[1], c[0]]);
+      feats.forEach(f => {
+        const props = (f && f.properties) || {};
+        const geom = f && f.geometry;
+        if (!geom) return;
+        if (props.loai === 'ranh_thon') {
+          if (geom.type === 'LineString') {
+            const pts = toLatLngRing(geom.coordinates || []);
+            if (pts.length > 1) thonLines.push(pts);
+          } else if (geom.type === 'MultiLineString') {
+            (geom.coordinates || []).forEach(line => {
+              const pts = toLatLngRing(line || []);
+              if (pts.length > 1) thonLines.push(pts);
+            });
+          }
+          return;
+        }
+        if (props.loai === 'nhan_thon') {
+          if (geom.type === 'Point') {
+            const [lo, la] = geom.coordinates || [];
+            if (!isNaN(la) && !isNaN(lo)) {
+              thonLabels.push({ lat: la, lon: lo, name: props.ten_thon || '' });
+            }
+          }
+          return;
+        }
+        let id = (props.khoa != null && props.khoa !== '') ? String(props.khoa) : null;
+        if (!id && props.label) {
+          const m = String(props.label).match(/^(\\d+[-–]\\d+)/);
+          if (m) id = m[1];
+        }
+        if (!id) return;
+        id = id.replace('–', '-');
+        if (!byId[id]) byId[id] = { id, lat: null, lon: null, linkHSQ: '', rings: [] };
+        const p = byId[id];
+        if (geom.type === 'Polygon') {
+          (geom.coordinates || []).forEach(ring => {
+            const pts = toLatLngRing(ring || []);
+            if (pts.length > 2) p.rings.push(pts);
+          });
+        } else if (geom.type === 'MultiPolygon') {
+          (geom.coordinates || []).forEach(poly => {
+            (poly || []).forEach(ring => {
+              const pts = toLatLngRing(ring || []);
+              if (pts.length > 2) p.rings.push(pts);
+            });
+          });
+        } else if (geom.type === 'Point') {
+          const [lo, la] = geom.coordinates || [];
+          if (!isNaN(la)) { p.lat = la; p.lon = lo; }
+          if (props.linkHSQ && !p.linkHSQ) p.linkHSQ = props.linkHSQ;
+        }
+      });
+      Object.values(byId).forEach(p => {
+        if (!p.lat && p.rings.length) {
+          const r = p.rings[0];
+          p.lat = r.reduce((s,c)=>s+c[0],0)/r.length;
+          p.lon = r.reduce((s,c)=>s+c[1],0)/r.length;
+        }
+      });
+      const parcels = Object.values(byId).filter(p => p.rings.length > 0 || p.lat)
+        .sort((a,b) => {
+          const [aT,aU] = a.id.split('-').map(Number);
+          const [bT,bU] = b.id.split('-').map(Number);
+          return aT!==bT ? aT-bT : aU-bU;
+        });
+      return { parcels, ranhThon: { lines: thonLines, labels: thonLabels } };
+    }
+  `;
+  return URL.createObjectURL(new Blob([workerSrc], { type: 'application/javascript' }));
+}
+
+function parseGeoJSONAsync(jsonText) {
+  return new Promise(resolve => {
+    let settled = false;
+    const fallback = () => { if (!settled) { settled = true; resolve(parseGeoJSON(jsonText)); } };
+    try {
+      if (!window.Worker) return fallback();
+      const url = getGeoJsonWorkerURL();
+      const worker = new Worker(url);
+      const timeout = setTimeout(() => { worker.terminate(); URL.revokeObjectURL(url); fallback(); }, 20000);
+      worker.onmessage = (e) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        worker.terminate();
+        URL.revokeObjectURL(url);
+        if (e.data && e.data.ok) resolve(e.data.data);
+        else resolve(parseGeoJSON(jsonText));
+      };
+      worker.onerror = () => { clearTimeout(timeout); worker.terminate(); URL.revokeObjectURL(url); fallback(); };
+      worker.postMessage(jsonText);
+    } catch (err) {
+      fallback();
+    }
+  });
+}
+
+// ── NHẬN DIỆN ĐỊNH DẠNG FILE (KML hay GeoJSON) ─────────────────────────────────
+function detectIsGeoJSON(filename, text) {
+  const lower = (filename || '').toLowerCase();
+  if (lower.endsWith('.geojson') || lower.endsWith('.json')) return true;
+  if (lower.endsWith('.kml') || lower.endsWith('.xml')) return false;
+  // Không xác định được qua đuôi file -> dò nội dung: JSON luôn bắt đầu bằng '{'
+  const t = (text || '').trim();
+  return t.startsWith('{');
+}
+
 // ── FILE ──────────────────────────────────────────────────────────────────────
 function handleFile(file) {
   if (!file) return;
   const r = new FileReader();
   r.onload = async e => {
-    showStatus('Đang phân tích dữ liệu KML...');
-    const result = await parseKMLAsync(e.target.result);
+    const text = e.target.result;
+    const isGeoJSON = detectIsGeoJSON(file.name, text);
+    showStatus(isGeoJSON ? 'Đang phân tích dữ liệu GeoJSON...' : 'Đang phân tích dữ liệu KML...');
+
+    let result;
+    try {
+      result = isGeoJSON ? await parseGeoJSONAsync(text) : await parseKMLAsync(text);
+    } catch (err) {
+      showAlert(
+        `Không thể đọc file này (${file.name}).\n` +
+        `Vui lòng kiểm tra đây là file .kml hoặc .geojson hợp lệ do TDMAP xuất ra.\n\nChi tiết lỗi: ${err}`
+      );
+      return;
+    }
+
     allParcels = result.parcels;
     await renderParcels(allParcels);
     renderRanhThon(result.ranhThon);
