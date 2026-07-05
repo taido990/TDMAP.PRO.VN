@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TDMAP.PRO.VN-2026</title>
+<title>TDMAP.PRO.VN-060726</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; width: 100%; overflow: hidden;
@@ -99,6 +99,29 @@
   }
   #zoomBadge.below-threshold .zb-dot {
     background: #ffc107; box-shadow: 0 0 6px rgba(255,193,7,.8);
+  }
+
+  /* CONTROL CHỌN NGƯỚNG ZOOM HIỆN NHÃN */
+  #labelZoomControl {
+    position: fixed; top: 104px; left: 15px;
+    z-index: 1001; display: flex; align-items: center; gap: 6px;
+    background: rgba(10,18,28,0.9);
+    border: 1px solid rgba(0,198,167,0.5); border-radius: 20px;
+    padding: 5px 10px 5px 14px;
+    max-width: calc(100vw - 30px);
+  }
+  #labelZoomControl .lzc-label {
+    font-size: 10px; font-weight: 700; color: #9fb3c0; white-space: nowrap;
+  }
+  .lzc-btn {
+    border: 1px solid rgba(255,255,255,0.18); background: transparent;
+    color: #cfd8dc; font-size: 11px; font-weight: 800;
+    width: 24px; height: 22px; border-radius: 6px; cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .lzc-btn:active { transform: scale(.92); }
+  .lzc-btn.active {
+    background: #00c6a7; border-color: #00c6a7; color: #06231d;
   }
 
   /* POPUP BẢN ĐỒ */
@@ -307,6 +330,12 @@
 
 <div id="statusPill" style="opacity:0">–</div>
 <div id="zoomBadge"><span class="zb-dot"></span><span id="zoomBadgeText">Zoom 13</span></div>
+<div id="labelZoomControl">
+  <span class="lzc-label">Nhãn từ zoom:</span>
+  <button class="lzc-btn" data-zoom="16">16</button>
+  <button class="lzc-btn" data-zoom="17">17</button>
+  <button class="lzc-btn" data-zoom="18">18</button>
+</div>
 
 <div id="popup">
   <div id="popupHandle"></div>
@@ -813,7 +842,37 @@ const scheduleChunk = window.requestIdleCallback
 // toàn bộ 3000+ thửa cùng lúc). Việc này chạy lại mỗi khi zoom/kéo bản đồ
 // (moveend) nhưng chỉ xử lý phần đang hiển thị nên rất nhẹ. Ranh thửa (polygon)
 // luôn hiển thị ở mọi mức zoom, chỉ nhãn + chấm điểm bị ẩn khi zoom nhỏ.
-const LABEL_MIN_ZOOM = 18; // Chỉ hiện nhãn + chấm điểm khi zoom >= mức này
+const LABEL_ZOOM_OPTIONS = [16, 17, 18];
+const LABEL_ZOOM_STORAGE_KEY = 'tdmap_labelMinZoom';
+// Ngưỡng hiện nhãn + chấm điểm — người dùng có thể đổi qua control 16/17/18,
+// lựa chọn được nhớ lại cho lần mở sau (localStorage). Mặc định 18 nếu chưa
+// từng chọn hoặc giá trị lưu không hợp lệ.
+let LABEL_MIN_ZOOM = (() => {
+  try {
+    const saved = parseInt(localStorage.getItem(LABEL_ZOOM_STORAGE_KEY), 10);
+    if (LABEL_ZOOM_OPTIONS.includes(saved)) return saved;
+  } catch (e) { /* localStorage có thể bị chặn (chế độ ẩn danh...) — bỏ qua */ }
+  return 18;
+})();
+
+function setLabelMinZoom(z) {
+  if (!LABEL_ZOOM_OPTIONS.includes(z) || z === LABEL_MIN_ZOOM) {
+    // Vẫn đồng bộ trạng thái nút active dù giá trị không đổi
+    document.querySelectorAll('.lzc-btn').forEach(b => b.classList.toggle('active', Number(b.dataset.zoom) === LABEL_MIN_ZOOM));
+    return;
+  }
+  LABEL_MIN_ZOOM = z;
+  try { localStorage.setItem(LABEL_ZOOM_STORAGE_KEY, String(z)); } catch (e) { /* bỏ qua nếu bị chặn */ }
+  document.querySelectorAll('.lzc-btn').forEach(b => b.classList.toggle('active', Number(b.dataset.zoom) === z));
+  updateAllLabels();
+  updateZoomBadge();
+  showStatus(`Đã đặt ngưỡng hiện nhãn/điểm: zoom ≥${z}`);
+}
+
+document.querySelectorAll('.lzc-btn').forEach(btn => {
+  btn.addEventListener('click', () => setLabelMinZoom(Number(btn.dataset.zoom)));
+});
+setLabelMinZoom(LABEL_MIN_ZOOM); // Đồng bộ nút active với giá trị khởi tạo
 function updateAllLabels() {
   const show = map.getZoom() >= LABEL_MIN_ZOOM;
   if (!show) {
