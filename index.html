@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TDMAP.PRO.VN-060726</title>
+<title>TDMAP.PRO.VN-070726</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; width: 100%; overflow: hidden;
@@ -154,6 +154,7 @@
     cursor: pointer; display: flex; align-items: center; justify-content: center;
   }
   #popupTitle { font-size: 17px; font-weight: 800; color: #111; margin-bottom: 2px; }
+  #popupInfo { font-size: 13px; font-weight: 700; color: #cc4400; margin-bottom: 6px; line-height: 1.5; }
   #popupCoords { font-size: 10px; color: #aaa; margin-bottom: 10px; }
 
   .btn-row { display: flex; gap: 10px; }
@@ -344,6 +345,7 @@
     <button id="popupClose" onclick="closePopup()">✕</button>
   </div>
   <div id="popupTitle">–</div>
+  <div id="popupInfo">–</div>
   <div id="popupCoords">–</div>
   <div class="btn-row">
     <a id="btnHSQ" class="btn-hsq" href="#" target="_blank" rel="noopener">
@@ -647,6 +649,13 @@ map.setView([12.7, 108.2], 13);
 // hàng nghìn thửa (mỗi polygon SVG là 1 thẻ DOM riêng, Canvas thì không).
 const mapCanvasRenderer = L.canvas({ padding: 0.5 });
 
+// ── TIỆN ÍCH ──────────────────────────────────────────────────────────────────
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let allParcels = [];
 let allLayers  = [];
@@ -658,6 +667,89 @@ let ranhThonLayers = [];
 // - parcels: các thửa đất (Polygon + Point có tên dạng "Tờ-Thửa")
 // - ranhThon.lines: các đoạn LineString ranh giới thôn/tổ dân phố
 // - ranhThon.labels: các Point có tên KHÔNG theo mẫu Tờ-Thửa (vd "TDP 8B")
+// Trích Diện tích / Loại đất / Tên chủ từ chuỗi "label" gộp dạng
+// "To-Thua-DienTich-LoaiDat[-TenChu]" (vd "109-605-156.2-CLN-đỗ tài").
+// Dùng chung cho cả KML (name/label placemark) và GeoJSON (properties.label)
+// khi các trường riêng lẻ không có sẵn.
+function parseLabelCompound(label, id) {
+  const out = { dienTich: '', loaiDat: '', tenChu: '' };
+  if (!label || !id) return out;
+  const prefix = id + '-';
+  if (!label.startsWith(prefix)) return out;
+  const rest = label.slice(prefix.length);
+  const m = rest.match(/^([\d.,]+)-([A-Za-zÀ-ỹ+]+)(?:-(.+))?$/);
+  if (m) {
+    out.dienTich = m[1] || '';
+    out.loaiDat  = m[2] || '';
+    out.tenChu   = (m[3] || '').trim();
+  }
+  return out;
+}
+
+// Trích Diện tích / Loại đất / Tên chủ từ ExtendedData (Data hoặc SchemaData/
+// SimpleData) của 1 Placemark KML, nếu file KML xuất kèm các trường này riêng.
+function extractKmlExtendedData(pm) {
+  const data = {};
+  pm.querySelectorAll('ExtendedData Data').forEach(d => {
+    const name = (d.getAttribute('name') || '').toLowerCase();
+    const valueEl = d.querySelector('value');
+    data[name] = (valueEl ? valueEl.textContent : '') || '';
+  });
+  pm.querySelectorAll('ExtendedData SchemaData SimpleData').forEach(d => {
+    const name = (d.getAttribute('name') || '').toLowerCase();
+    data[name] = d.textContent || '';
+  });
+  return data;
+}
+
+function pickField(data, keys) {
+  for (const k of keys) { if (data[k]) return data[k]; }
+  return '';
+}
+
+// Trích Diện tích / Loại đất / Tên chủ từ nội dung mô tả (description) dạng
+// text/HTML có ghi rõ nhãn Việt hoá, vd "Diện tích: 156.2, Loại đất: CLN...".
+function parseDescFields(desc) {
+  const out = { dienTich: '', loaiDat: '', tenChu: '' };
+  if (!desc) return out;
+  const mD = desc.match(/Di[eệ]n\s*t[íi]ch[:\s]+([\d.,]+)/i);
+  const mL = desc.match(/Lo[aạ]i\s*đ[aấ]t[:\s]+([^\n,<]+)/i);
+  const mT = desc.match(/T[eê]n\s*ch[uủ][:\s]+([^\n<]+)/i);
+  if (mD) out.dienTich = mD[1].trim();
+  if (mL) out.loaiDat = mL[1].trim();
+  if (mT) out.tenChu = mT[1].trim();
+  return out;
+}
+
+// Bổ sung dienTich/loaiDat/tenChu cho 1 thửa (p) từ 1 Placemark KML (pm),
+// thử lần lượt: ExtendedData -> chuỗi name gộp -> description. Chỉ điền
+// vào những trường còn thiếu (không ghi đè dữ liệu đã có).
+function enrichParcelFromKmlPlacemark(p, pm, name, id) {
+  if (p.dienTich && p.loaiDat && p.tenChu) return;
+  const ext = extractKmlExtendedData(pm);
+  const dt = pickField(ext, ['dientich', 'dien_tich', 'area', 'dt', 'dientich(m2)']);
+  const ld = pickField(ext, ['loaidat', 'loai_dat', 'landtype', 'ld', 'loai']);
+  const tc = pickField(ext, ['tenchu', 'ten_chu', 'owner', 'chusd', 'chusudung', 'chu_su_dung']);
+  if (!p.dienTich && dt) p.dienTich = dt;
+  if (!p.loaiDat && ld) p.loaiDat = ld;
+  if (!p.tenChu && tc) p.tenChu = tc;
+
+  if (!p.dienTich || !p.loaiDat) {
+    const lc = parseLabelCompound(name.trim(), id);
+    if (!p.dienTich && lc.dienTich) p.dienTich = lc.dienTich;
+    if (!p.loaiDat && lc.loaiDat) p.loaiDat = lc.loaiDat;
+    if (!p.tenChu && lc.tenChu) p.tenChu = lc.tenChu;
+  }
+
+  if (!p.dienTich || !p.loaiDat || !p.tenChu) {
+    const descEl = pm.querySelector('description');
+    const dd = parseDescFields(descEl ? descEl.textContent : '');
+    if (!p.dienTich && dd.dienTich) p.dienTich = dd.dienTich;
+    if (!p.loaiDat && dd.loaiDat) p.loaiDat = dd.loaiDat;
+    if (!p.tenChu && dd.tenChu) p.tenChu = dd.tenChu;
+  }
+}
+
 function parseKML(xml) {
   const doc = new DOMParser().parseFromString(xml, 'text/xml');
   const pms = Array.from(doc.querySelectorAll('Placemark'));
@@ -692,8 +784,9 @@ function parseKML(xml) {
       return;
     }
 
-    if (!byId[id]) byId[id] = { id, lat:null, lon:null, linkHSQ:'', rings:[] };
+    if (!byId[id]) byId[id] = { id, lat:null, lon:null, linkHSQ:'', dienTich:'', loaiDat:'', tenChu:'', chiDuong:'', rings:[] };
     const p = byId[id];
+    enrichParcelFromKmlPlacemark(p, pm, name, id);
 
     pm.querySelectorAll('Polygon outerBoundaryIs LinearRing coordinates').forEach(el => {
       const pts = el.textContent.trim().split(/\s+/).map(s => {
@@ -710,6 +803,8 @@ function parseKML(xml) {
       const desc = (pm.querySelector('description')||{}).textContent||'';
       const m = (name+' '+desc).match(/https?:\/\/drive\.google\.com\S+/);
       if (m && !p.linkHSQ) p.linkHSQ = m[0].replace(/&/g,'&');
+      const mMaps = (name+' '+desc).match(/https?:\/\/www\.google\.com\/maps\S+/);
+      if (mMaps && !p.chiDuong) p.chiDuong = mMaps[0].replace(/&/g,'&');
     }
   });
 
@@ -787,8 +882,21 @@ function parseGeoJSON(text) {
     if (!id) return;
     id = id.replace('–', '-');
 
-    if (!byId[id]) byId[id] = { id, lat: null, lon: null, linkHSQ: '', rings: [] };
+    if (!byId[id]) byId[id] = { id, lat: null, lon: null, linkHSQ: '', dienTich: '', loaiDat: '', tenChu: '', chiDuong: '', rings: [] };
     const p = byId[id];
+
+    // Bổ sung dienTich/loaiDat/tenChu: ưu tiên các trường riêng lẻ do QGIS
+    // xuất ra, nếu thiếu thì thử tách từ chuỗi "label" gộp.
+    if (props.dienTich != null && props.dienTich !== '' && !p.dienTich) p.dienTich = String(props.dienTich);
+    if (props.loaiDat && !p.loaiDat) p.loaiDat = String(props.loaiDat);
+    if (props.tenChu && !p.tenChu) p.tenChu = String(props.tenChu);
+    if ((!p.dienTich || !p.loaiDat || !p.tenChu) && props.label) {
+      const lc = parseLabelCompound(String(props.label), id);
+      if (!p.dienTich && lc.dienTich) p.dienTich = lc.dienTich;
+      if (!p.loaiDat && lc.loaiDat) p.loaiDat = lc.loaiDat;
+      if (!p.tenChu && lc.tenChu) p.tenChu = lc.tenChu;
+    }
+    if (props.chiDuong && !p.chiDuong) p.chiDuong = String(props.chiDuong);
 
     if (geom.type === 'Polygon') {
       (geom.coordinates || []).forEach(ring => {
@@ -845,14 +953,14 @@ const scheduleChunk = window.requestIdleCallback
 const LABEL_ZOOM_OPTIONS = [16, 17, 18];
 const LABEL_ZOOM_STORAGE_KEY = 'tdmap_labelMinZoom';
 // Ngưỡng hiện nhãn + chấm điểm — người dùng có thể đổi qua control 16/17/18,
-// lựa chọn được nhớ lại cho lần mở sau (localStorage). Mặc định 18 nếu chưa
+// lựa chọn được nhớ lại cho lần mở sau (localStorage). Mặc định 17 nếu chưa
 // từng chọn hoặc giá trị lưu không hợp lệ.
 let LABEL_MIN_ZOOM = (() => {
   try {
     const saved = parseInt(localStorage.getItem(LABEL_ZOOM_STORAGE_KEY), 10);
     if (LABEL_ZOOM_OPTIONS.includes(saved)) return saved;
   } catch (e) { /* localStorage có thể bị chặn (chế độ ẩn danh...) — bỏ qua */ }
-  return 18;
+  return 17;
 })();
 
 function setLabelMinZoom(z) {
@@ -956,10 +1064,13 @@ function renderParcels(list) {
         });
         dot.on('click tap', () => openPopup(p));
 
+        const lblHtml = p.tenChu
+          ? `${escapeHtml(p.id)}<span class="lbl-owner">${escapeHtml(p.tenChu)}</span>`
+          : escapeHtml(p.id);
         p._lbl = L.tooltip({
           permanent: true, direction: 'center',
           className: 'lbl-style', offset: [0, 0]
-        }).setContent(p.id);
+        }).setContent(lblHtml);
         p._lblBound = false;
         p._dotAdded = false; // Chấm điểm chỉ được addTo(map) khi zoom đủ lớn (xem updateAllLabels)
 
@@ -1021,10 +1132,19 @@ function openPopup(p) {
   document.getElementById('searchInput').value = p.id;
 
   document.getElementById('popupTitle').textContent  = 'Tờ-Thửa ' + p.id;
+
+  // Dòng thông tin chi tiết: Tờ, Thửa, Diện tích, Loại đất, Tên chủ (nếu có)
+  const [toNum, thuaNum] = p.id.split('-');
+  const infoParts = [`Tờ: ${toNum}`, `Thửa: ${thuaNum}`];
+  if (p.dienTich) infoParts.push(`Diện tích: ${p.dienTich}`);
+  if (p.loaiDat) infoParts.push(`Loại đất: ${p.loaiDat}`);
+  if (p.tenChu) infoParts.push(`Tên chủ: ${p.tenChu}`);
+  document.getElementById('popupInfo').textContent = infoParts.join(', ');
+
   document.getElementById('popupCoords').textContent =
     `${(p.lat||0).toFixed(7)}, ${(p.lon||0).toFixed(7)}`;
 
-  const mapsURL = `https://www.google.com/maps?q=${p.lat},${p.lon}`;
+  const mapsURL = p.chiDuong || `https://www.google.com/maps?q=${p.lat},${p.lon}`;
   document.getElementById('btnMaps').href = mapsURL;
 
   const btnHSQ = document.getElementById('btnHSQ');
@@ -1127,6 +1247,71 @@ function getKmlWorkerURL() {
         self.postMessage({ ok: false, error: String(err) });
       }
     };
+    function parseLabelCompound(label, id) {
+      const out = { dienTich: '', loaiDat: '', tenChu: '' };
+      if (!label || !id) return out;
+      const prefix = id + '-';
+      if (!label.startsWith(prefix)) return out;
+      const rest = label.slice(prefix.length);
+      const m = rest.match(/^([\\d.,]+)-([A-Za-zÀ-ỹ+]+)(?:-(.+))?$/);
+      if (m) {
+        out.dienTich = m[1] || '';
+        out.loaiDat  = m[2] || '';
+        out.tenChu   = (m[3] || '').trim();
+      }
+      return out;
+    }
+    function extractKmlExtendedData(pm) {
+      const data = {};
+      pm.querySelectorAll('ExtendedData Data').forEach(d => {
+        const name = (d.getAttribute('name') || '').toLowerCase();
+        const valueEl = d.querySelector('value');
+        data[name] = (valueEl ? valueEl.textContent : '') || '';
+      });
+      pm.querySelectorAll('ExtendedData SchemaData SimpleData').forEach(d => {
+        const name = (d.getAttribute('name') || '').toLowerCase();
+        data[name] = d.textContent || '';
+      });
+      return data;
+    }
+    function pickField(data, keys) {
+      for (const k of keys) { if (data[k]) return data[k]; }
+      return '';
+    }
+    function parseDescFields(desc) {
+      const out = { dienTich: '', loaiDat: '', tenChu: '' };
+      if (!desc) return out;
+      const mD = desc.match(/Di[eệ]n\\s*t[íi]ch[:\\s]+([\\d.,]+)/i);
+      const mL = desc.match(/Lo[aạ]i\\s*đ[aấ]t[:\\s]+([^\\n,<]+)/i);
+      const mT = desc.match(/T[eê]n\\s*ch[uủ][:\\s]+([^\\n<]+)/i);
+      if (mD) out.dienTich = mD[1].trim();
+      if (mL) out.loaiDat = mL[1].trim();
+      if (mT) out.tenChu = mT[1].trim();
+      return out;
+    }
+    function enrichParcelFromKmlPlacemark(p, pm, name, id) {
+      if (p.dienTich && p.loaiDat && p.tenChu) return;
+      const ext = extractKmlExtendedData(pm);
+      const dt = pickField(ext, ['dientich', 'dien_tich', 'area', 'dt']);
+      const ld = pickField(ext, ['loaidat', 'loai_dat', 'landtype', 'ld', 'loai']);
+      const tc = pickField(ext, ['tenchu', 'ten_chu', 'owner', 'chusd', 'chusudung', 'chu_su_dung']);
+      if (!p.dienTich && dt) p.dienTich = dt;
+      if (!p.loaiDat && ld) p.loaiDat = ld;
+      if (!p.tenChu && tc) p.tenChu = tc;
+      if (!p.dienTich || !p.loaiDat) {
+        const lc = parseLabelCompound(name.trim(), id);
+        if (!p.dienTich && lc.dienTich) p.dienTich = lc.dienTich;
+        if (!p.loaiDat && lc.loaiDat) p.loaiDat = lc.loaiDat;
+        if (!p.tenChu && lc.tenChu) p.tenChu = lc.tenChu;
+      }
+      if (!p.dienTich || !p.loaiDat || !p.tenChu) {
+        const descEl = pm.querySelector('description');
+        const dd = parseDescFields(descEl ? descEl.textContent : '');
+        if (!p.dienTich && dd.dienTich) p.dienTich = dd.dienTich;
+        if (!p.loaiDat && dd.loaiDat) p.loaiDat = dd.loaiDat;
+        if (!p.tenChu && dd.tenChu) p.tenChu = dd.tenChu;
+      }
+    }
     function parseKML(xml) {
       const doc = new DOMParser().parseFromString(xml, 'text/xml');
       const pms = Array.from(doc.querySelectorAll('Placemark'));
@@ -1155,8 +1340,9 @@ function getKmlWorkerURL() {
           }
           return;
         }
-        if (!byId[id]) byId[id] = { id, lat:null, lon:null, linkHSQ:'', rings:[] };
+        if (!byId[id]) byId[id] = { id, lat:null, lon:null, linkHSQ:'', dienTich:'', loaiDat:'', tenChu:'', chiDuong:'', rings:[] };
         const p = byId[id];
+        enrichParcelFromKmlPlacemark(p, pm, name, id);
         pm.querySelectorAll('Polygon outerBoundaryIs LinearRing coordinates').forEach(el => {
           const pts = el.textContent.trim().split(/\\s+/).map(s => {
             const [lo, la] = s.split(',').map(Number);
@@ -1171,6 +1357,8 @@ function getKmlWorkerURL() {
           const desc = (pm.querySelector('description')||{}).textContent||'';
           const m = (name+' '+desc).match(/https?:\\/\\/drive\\.google\\.com\\S+/);
           if (m && !p.linkHSQ) p.linkHSQ = m[0].replace(/&/g,'&');
+          const mMaps = (name+' '+desc).match(/https?:\\/\\/www\\.google\\.com\\/maps\\S+/);
+          if (mMaps && !p.chiDuong) p.chiDuong = mMaps[0].replace(/&/g,'&');
         }
       });
       Object.values(byId).forEach(p => {
@@ -1228,6 +1416,20 @@ function getGeoJsonWorkerURL() {
         self.postMessage({ ok: false, error: String(err) });
       }
     };
+    function parseLabelCompound(label, id) {
+      const out = { dienTich: '', loaiDat: '', tenChu: '' };
+      if (!label || !id) return out;
+      const prefix = id + '-';
+      if (!label.startsWith(prefix)) return out;
+      const rest = label.slice(prefix.length);
+      const m = rest.match(/^([\\d.,]+)-([A-Za-zÀ-ỹ+]+)(?:-(.+))?$/);
+      if (m) {
+        out.dienTich = m[1] || '';
+        out.loaiDat  = m[2] || '';
+        out.tenChu   = (m[3] || '').trim();
+      }
+      return out;
+    }
     function parseGeoJSON(text) {
       const gj = typeof text === 'string' ? JSON.parse(text) : text;
       const feats = (gj && gj.features) || [];
@@ -1267,8 +1469,18 @@ function getGeoJsonWorkerURL() {
         }
         if (!id) return;
         id = id.replace('–', '-');
-        if (!byId[id]) byId[id] = { id, lat: null, lon: null, linkHSQ: '', rings: [] };
+        if (!byId[id]) byId[id] = { id, lat: null, lon: null, linkHSQ: '', dienTich: '', loaiDat: '', tenChu: '', chiDuong: '', rings: [] };
         const p = byId[id];
+        if (props.dienTich != null && props.dienTich !== '' && !p.dienTich) p.dienTich = String(props.dienTich);
+        if (props.loaiDat && !p.loaiDat) p.loaiDat = String(props.loaiDat);
+        if (props.tenChu && !p.tenChu) p.tenChu = String(props.tenChu);
+        if ((!p.dienTich || !p.loaiDat || !p.tenChu) && props.label) {
+          const lc = parseLabelCompound(String(props.label), id);
+          if (!p.dienTich && lc.dienTich) p.dienTich = lc.dienTich;
+          if (!p.loaiDat && lc.loaiDat) p.loaiDat = lc.loaiDat;
+          if (!p.tenChu && lc.tenChu) p.tenChu = lc.tenChu;
+        }
+        if (props.chiDuong && !p.chiDuong) p.chiDuong = String(props.chiDuong);
         if (geom.type === 'Polygon') {
           (geom.coordinates || []).forEach(ring => {
             const pts = toLatLngRing(ring || []);
@@ -1399,11 +1611,21 @@ s.textContent = `.lbl-style {
   border-radius: 4px !important;
   box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
   color: #cc0000 !important; font-size: 10px; font-weight: 800;
-  padding: 1px 5px !important;
+  padding: 2px 6px !important;
   text-shadow: none;
   pointer-events: none;
+  white-space: nowrap !important;
+  text-align: center;
+  line-height: 1.25;
 }
 .lbl-style::before { display: none !important; }
+.lbl-style .lbl-owner {
+  display: block;
+  color: #1a6fd4 !important;
+  font-size: 9px; font-weight: 700;
+  margin-top: 1px;
+  white-space: nowrap;
+}
 .thon-lbl-style {
   color: #00cc44 !important;
   font-size: 12px; font-weight: 800;
