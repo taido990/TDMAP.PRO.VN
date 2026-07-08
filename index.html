@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TDMAP.PRO.VN-070726</title>
+<title>TDMAP.PRO.VN-080726</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; width: 100%; overflow: hidden;
@@ -327,7 +327,7 @@
   <button id="searchBtn" onclick="executeSearch()" title="Tìm kiếm thửa đất">🔍</button>
   <button id="loadBtn" onclick="document.getElementById('fileInput').click()">📂 Mở file</button>
 </div>
-<input type="file" id="fileInput" accept=".kml,.geojson" onchange="handleFile(this.files[0])">
+<input type="file" id="fileInput" accept=".kml,.geojson,application/vnd.google-earth.kml+xml,application/geo+json,application/json" onchange="handleFile(this.files[0])">
 
 <div id="statusPill" style="opacity:0">–</div>
 <div id="zoomBadge"><span class="zb-dot"></span><span id="zoomBadgeText">Zoom 13</span></div>
@@ -336,6 +336,7 @@
   <button class="lzc-btn" data-zoom="16">16</button>
   <button class="lzc-btn" data-zoom="17">17</button>
   <button class="lzc-btn" data-zoom="18">18</button>
+  <button class="lzc-btn" data-zoom="19">19</button>
 </div>
 
 <div id="popup">
@@ -950,7 +951,7 @@ const scheduleChunk = window.requestIdleCallback
 // toàn bộ 3000+ thửa cùng lúc). Việc này chạy lại mỗi khi zoom/kéo bản đồ
 // (moveend) nhưng chỉ xử lý phần đang hiển thị nên rất nhẹ. Ranh thửa (polygon)
 // luôn hiển thị ở mọi mức zoom, chỉ nhãn + chấm điểm bị ẩn khi zoom nhỏ.
-const LABEL_ZOOM_OPTIONS = [16, 17, 18];
+const LABEL_ZOOM_OPTIONS = [16, 17, 18, 19];
 const LABEL_ZOOM_STORAGE_KEY = 'tdmap_labelMinZoom';
 // Ngưỡng hiện nhãn + chấm điểm — người dùng có thể đổi qua control 16/17/18,
 // lựa chọn được nhớ lại cho lần mở sau (localStorage). Mặc định 17 nếu chưa
@@ -1159,9 +1160,22 @@ function openPopup(p) {
   document.getElementById('popup').classList.add('open');
   
   if (p._poly && p.rings.length > 0) {
-    map.fitBounds(p._poly.getBounds(), { maxZoom: 19, animate: true, duration: 0.6 });
+    const center = p._poly.getBounds().getCenter();
+    const curZoom = map.getZoom();
+    const MIN_VIEW_ZOOM = 17; // đảm bảo nhìn rõ thửa khi click
+    if (curZoom < MIN_VIEW_ZOOM) {
+      map.flyTo(center, MIN_VIEW_ZOOM, { animate: true, duration: 0.6 });
+    } else {
+      map.panTo(center, { animate: true, duration: 0.6 }); // giữ nguyên zoom hiện tại, không tự thu nhỏ
+    }
   } else if (p.lat) {
-    map.flyTo([p.lat, p.lon], 19, { animate: true, duration: 0.6 });
+    const curZoom = map.getZoom();
+    const MIN_VIEW_ZOOM = 17;
+    if (curZoom < MIN_VIEW_ZOOM) {
+      map.flyTo([p.lat, p.lon], MIN_VIEW_ZOOM, { animate: true, duration: 0.6 });
+    } else {
+      map.panTo([p.lat, p.lon], { animate: true, duration: 0.6 }); // giữ nguyên zoom hiện tại
+    }
   }
 }
 
@@ -1557,6 +1571,15 @@ function detectIsGeoJSON(filename, text) {
 // ── FILE ──────────────────────────────────────────────────────────────────────
 function handleFile(file) {
   if (!file) return;
+  const nameLower = file.name.toLowerCase();
+  if (!nameLower.endsWith('.kml') && !nameLower.endsWith('.geojson') && !nameLower.endsWith('.json')) {
+    showAlert(
+      `File "${file.name}" không đúng định dạng.\n` +
+      `Vui lòng chọn file có đuôi .kml hoặc .geojson do TDMAP xuất ra.`
+    );
+    document.getElementById('fileInput').value = '';
+    return;
+  }
   const r = new FileReader();
   r.onload = async e => {
     const text = e.target.result;
