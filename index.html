@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TDMAP.PRO.VN-090726</title>
+<title>TDMAP.PRO.VN-100726</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; width: 100%; overflow: hidden;
@@ -142,14 +142,19 @@
     background: #ffc107; box-shadow: 0 0 6px rgba(255,193,7,.8);
   }
 
+  /* HÀNG CHỨA: CONTROL CHỌN NGƯỠNG ZOOM + NÚT HSQ XÃ (cùng 1 hàng) */
+  #topControlsRow {
+    position: fixed; top: 53px; left: 15px; z-index: 1001;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    max-width: calc(100vw - 30px);
+  }
   /* CONTROL CHỌN NGƯỚNG ZOOM HIỆN NHÃN */
   #labelZoomControl {
-    position: fixed; top: 53px; left: 15px;
-    z-index: 1001; display: flex; align-items: center; gap: 6px;
+    display: flex; align-items: center; gap: 6px;
     background: rgba(10,18,28,0.9);
     border: 1px solid rgba(0,198,167,0.5); border-radius: 20px;
     padding: 5px 10px 5px 14px;
-    max-width: calc(100vw - 30px);
+    flex-shrink: 0;
   }
   #labelZoomControl .lzc-label {
     font-size: 10px; font-weight: 700; color: #9fb3c0; white-space: nowrap;
@@ -211,6 +216,82 @@
   .btn-maps { background: linear-gradient(135deg,#e8430a,#c2320a); }
   .btn-row a .ico { font-size: 13px; }
   .btn-row a.disabled { opacity: .3; pointer-events: none; }
+
+  /* NÚT: LINK HSQ XÃ (ngoài danh sách thửa trong file KML/GeoJSON) - cùng hàng với labelZoomControl */
+  #hsqXaBtn {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(10,18,28,0.9);
+    border: 1px solid rgba(0,198,167,0.5); border-radius: 20px;
+    padding: 7px 14px; font-size: 11.5px; font-weight: 800;
+    color: #00c6a7; cursor: pointer; white-space: nowrap;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+    transition: background .2s, transform .1s;
+  }
+  #hsqXaBtn:active { transform: scale(.96); background: rgba(0,198,167,0.18); }
+  #hsqXaBtn .ico { font-size: 13px; }
+
+  /* HỘP THOẠI CHUNG (NHẬP LINK / HƯỚNG DẪN SCAN) */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(2px);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-overlay.show { opacity: 1; pointer-events: all; }
+  .modal-box {
+    background: #fff; width: 90%; max-width: 340px;
+    border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    transform: scale(0.9); transition: transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    overflow: hidden; max-height: 82vh; display: flex; flex-direction: column;
+  }
+  .modal-overlay.show .modal-box { transform: scale(1); }
+  .modal-header {
+    background: #f8f9fa; padding: 14px 18px;
+    font-weight: 800; font-size: 14px; color: #00c6a7;
+    border-bottom: 1px solid #eaeaea; letter-spacing: 0.3px;
+    flex-shrink: 0;
+  }
+  .modal-body {
+    padding: 16px 18px; font-size: 13.5px; color: #444;
+    line-height: 1.6; overflow-y: auto;
+  }
+  .modal-footer {
+    padding: 12px 18px 16px; display: flex; justify-content: flex-end;
+    gap: 8px; flex-wrap: wrap; flex-shrink: 0; border-top: 1px solid #f0f0f0;
+  }
+  .modal-btn {
+    border: none; border-radius: 8px;
+    padding: 9px 16px; font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: filter 0.15s, transform 0.1s;
+    color: #fff;
+  }
+  .modal-btn:active { transform: scale(0.95); filter: brightness(.85); }
+  .modal-btn.primary   { background: #1a6fd4; }
+  .modal-btn.secondary { background: #9aa4ad; }
+  .modal-btn.ghost {
+    background: transparent; color: #d9534f; padding: 9px 8px;
+    margin-right: auto;
+  }
+  #linkPromptInput {
+    width: 100%; box-sizing: border-box;
+    border: 1.5px solid rgba(0,0,0,0.15); border-radius: 8px;
+    padding: 10px 12px; font-size: 13.5px; color: #222;
+    outline: none; margin-top: 4px;
+  }
+  #linkPromptInput:focus { border-color: #00c6a7; }
+  .hsq-guide-item {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 8px 0; border-bottom: 1px solid #f2f2f2;
+  }
+  .hsq-guide-item:last-child { border-bottom: none; }
+  .hsq-guide-item b { color: #00c6a7; flex-shrink: 0; }
+  .hsq-guide-item code {
+    background: #f2f7f6; color: #cc4400; padding: 1px 6px;
+    border-radius: 5px; font-size: 12.5px; font-weight: 700;
+    white-space: nowrap; display: inline-block;
+  }
+  .hsq-guide-example { display: block; color: #0d47a1; font-weight: 700; font-size: 11.5px; margin-top: 2px; white-space: nowrap; }
 
   /* SPLASH */
   #splash {
@@ -373,12 +454,18 @@
 
 <div id="statusPill" style="opacity:0">–</div>
 <div id="zoomBadge"><span class="zb-dot"></span><span id="zoomBadgeText">Zoom 13</span></div>
-<div id="labelZoomControl">
-  <span class="lzc-label">Nhãn từ zoom:</span>
-  <button class="lzc-btn" data-zoom="16">16</button>
-  <button class="lzc-btn" data-zoom="17">17</button>
-  <button class="lzc-btn" data-zoom="18">18</button>
-  <button class="lzc-btn" data-zoom="19">19</button>
+<div id="topControlsRow">
+  <div id="labelZoomControl">
+    <span class="lzc-label">Nhãn từ zoom:</span>
+    <button class="lzc-btn" data-zoom="16">16</button>
+    <button class="lzc-btn" data-zoom="17">17</button>
+    <button class="lzc-btn" data-zoom="18">18</button>
+    <button class="lzc-btn" data-zoom="19">19</button>
+  </div>
+
+  <button id="hsqXaBtn" title="Link HSQ chung của Xã (ngoài danh sách thửa trong file)" onclick="openHsqXaLink()">
+    <span class="ico">🗂️</span> HSQ Ngoài Danh Sách
+  </button>
 </div>
 
 <div id="popup">
@@ -391,7 +478,7 @@
   <div id="popupInfo">–</div>
   <div id="popupCoords">–</div>
   <div class="btn-row">
-    <a id="btnHSQ" class="btn-hsq" href="#" target="_blank" rel="noopener">
+    <a id="btnHSQ" class="btn-hsq" href="#" rel="noopener" onclick="event.preventDefault(); openParcelHsqWithGuide(this.href);">
       <span class="ico">📁</span> Hồ sơ HSQ
     </a>
     <a id="btnMaps" class="btn-maps" href="#" onclick="event.preventDefault(); openDirections();">
@@ -447,6 +534,35 @@
     <div id="customAlertBody"></div>
     <div id="customAlertFooter">
       <button id="customAlertBtn" onclick="closeAlert()">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NHẬP / SỬA LINK HSQ CHUNG CỦA XÃ -->
+<div id="linkPromptOverlay" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">🗂️ Link HSQ của Xã</div>
+    <div class="modal-body">
+      <p style="margin-bottom:10px;color:#666;">Dán link thư mục Google Drive chứa Hồ sơ quét (HSQ) chung của toàn xã (áp dụng ngoài danh sách các thửa có trong file KML/GeoJSON đã tải):</p>
+      <input id="linkPromptInput" type="text" placeholder="https://drive.google.com/drive/folders/...">
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn ghost" onclick="clearHsqXaLink()">Xóa link</button>
+      <button class="modal-btn secondary" onclick="closeLinkPrompt()">Hủy</button>
+      <button class="modal-btn primary" onclick="saveLinkPrompt()">Lưu &amp; Mở</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: HƯỚNG DẪN ĐẶT TÊN FILE KHI SCAN HSQ -->
+<div id="hsqGuideOverlay" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">📋 Hướng dẫn đặt tên file khi scan</div>
+    <div class="modal-body" id="hsqGuideBody"></div>
+    <div class="modal-footer">
+      <button id="hsqGuideChangeBtn" class="modal-btn ghost" style="display:none;" onclick="changeHsqXaLink()">✎ Đổi link</button>
+      <button class="modal-btn secondary" onclick="closeHsqGuide()">Đóng</button>
+      <button class="modal-btn primary" onclick="confirmOpenHsq()">📁 Mở thư mục HSQ</button>
     </div>
   </div>
 </div>
@@ -606,6 +722,101 @@ function showAlert(message) {
 }
 function closeAlert() {
   document.getElementById('customAlertOverlay').classList.remove('show');
+}
+
+// ── LINK HSQ CHUNG CỦA XÃ (độc lập với danh sách thửa trong file KML/GeoJSON) ─
+const HSQ_XA_KEY = 'tdmap_hsq_xa_link_v1';
+let pendingHsqUrl = null;
+// Link HSQ Tổng của xã ĐỌC ĐƯỢC TỪ FILE đang mở (nếu QGIS script TDMAP đã gắn sẵn) —
+// được ưu tiên dùng trước link đã lưu thủ công trong localStorage.
+let currentFileHsqXaLink = '';
+
+function openHsqXaLink() {
+  const fromFile = (currentFileHsqXaLink || '').trim();
+  if (fromFile) { showHsqGuide(fromFile, null, true); return; }
+  const saved = (localStorage.getItem(HSQ_XA_KEY) || '').trim();
+  if (!saved) { openLinkPrompt(); return; }
+  showHsqGuide(saved, null, true);
+}
+
+function openLinkPrompt() {
+  const input = document.getElementById('linkPromptInput');
+  input.value = currentFileHsqXaLink || localStorage.getItem(HSQ_XA_KEY) || '';
+  document.getElementById('linkPromptOverlay').classList.add('show');
+  setTimeout(() => input.focus(), 60);
+}
+function closeLinkPrompt() {
+  document.getElementById('linkPromptOverlay').classList.remove('show');
+}
+function saveLinkPrompt() {
+  const val = document.getElementById('linkPromptInput').value.trim();
+  if (!val) { showAlert('Vui lòng dán link thư mục Google Drive chứa HSQ của xã trước khi lưu.'); return; }
+  localStorage.setItem(HSQ_XA_KEY, val);
+  currentFileHsqXaLink = val; // có hiệu lực ngay, ưu tiên hơn link cũ đọc từ file (nếu có)
+  closeLinkPrompt();
+  showStatus('✓ Đã lưu link HSQ Xã');
+  showHsqGuide(val, null, true);
+}
+function clearHsqXaLink() {
+  localStorage.removeItem(HSQ_XA_KEY);
+  currentFileHsqXaLink = '';
+  document.getElementById('linkPromptInput').value = '';
+  closeLinkPrompt();
+  showStatus('Đã xóa link HSQ Xã đã lưu');
+}
+function changeHsqXaLink() {
+  closeHsqGuide();
+  openLinkPrompt();
+}
+
+// ── HƯỚNG DẪN ĐẶT TÊN FILE KHI SCAN HSQ ───────────────────────────────────────
+// Hướng dẫn khi mở HSQ của TỪNG THỬA (nút "Hồ sơ HSQ" trong popup thửa) — mẫu đơn giản.
+function buildHsqGuideHtmlThua(parcelId) {
+  const example = parcelId ? `${parcelId}-don.pdf` : '10-150-don.pdf';
+  return `
+    <div class="hsq-guide-item"><b>1.</b><div>Scan CCCD chủ 1 → lưu: <code>c1.pdf</code></div></div>
+    <div class="hsq-guide-item"><b>2.</b><div>Scan CCCD chủ 2 → lưu: <code>c2.pdf</code></div></div>
+    <div class="hsq-guide-item"><b>3.</b><div>Scan Đơn đăng ký cấp giấy → lưu: <code>Tờ-thửa-don.pdf</code>
+      <span class="hsq-guide-example">Ví dụ: ${example}</span></div></div>
+    <div class="hsq-guide-item"><b>4.</b><div>Scan Giấy chứng nhận → lưu: <code>Số phát hành.pdf</code>
+      <span class="hsq-guide-example">Ví dụ: AB 123456.pdf</span></div></div>
+  `;
+}
+// Hướng dẫn khi mở HSQ Tổng CHUNG CỦA XÃ (nút "HSQ Ngoài Danh Sách") — mẫu kèm Số phát hành
+// để phân biệt nhiều chủ/nhiều bộ hồ sơ gộp chung trong 1 thư mục của xã.
+function buildHsqGuideHtmlXa() {
+  return `
+    <div class="hsq-guide-item"><b>1.</b><div>Scan CCCD chủ 1 → lưu: <code>c1-Số phát hành.pdf</code>
+      <span class="hsq-guide-example">Ví dụ: c1-AB 123456.pdf</span></div></div>
+    <div class="hsq-guide-item"><b>2.</b><div>Scan CCCD chủ 2 → lưu: <code>c2-Số phát hành.pdf</code>
+      <span class="hsq-guide-example">Ví dụ: c2-AB 123456.pdf</span></div></div>
+    <div class="hsq-guide-item"><b>3.</b><div>Scan Đơn đăng ký cấp giấy → lưu: <code>Tờ-thửa-don.pdf</code>
+      <span class="hsq-guide-example">Ví dụ: 10-150-don.pdf</span></div></div>
+    <div class="hsq-guide-item"><b>4.</b><div>Scan Giấy chứng nhận → lưu: <code>Số phát hành.pdf</code>
+      <span class="hsq-guide-example">Ví dụ: AB 123456.pdf</span></div></div>
+  `;
+}
+function showHsqGuide(url, parcelId, allowChange) {
+  pendingHsqUrl = url;
+  // allowChange = true ⟶ đang mở từ nút HSQ chung của xã ⟶ dùng mẫu hướng dẫn của xã.
+  // allowChange = false ⟶ đang mở HSQ của 1 thửa cụ thể ⟶ dùng mẫu hướng dẫn đơn giản.
+  document.getElementById('hsqGuideBody').innerHTML = allowChange
+    ? buildHsqGuideHtmlXa()
+    : buildHsqGuideHtmlThua(parcelId);
+  document.getElementById('hsqGuideChangeBtn').style.display = allowChange ? 'inline-flex' : 'none';
+  document.getElementById('hsqGuideOverlay').classList.add('show');
+}
+function closeHsqGuide() {
+  document.getElementById('hsqGuideOverlay').classList.remove('show');
+}
+function confirmOpenHsq() {
+  if (pendingHsqUrl) window.open(pendingHsqUrl, '_blank', 'noopener');
+  closeHsqGuide();
+}
+function openParcelHsqWithGuide(url) {
+  if (!url || url === '#' || url.endsWith('#')) return;
+  const parcelId = activeP ? activeP.id : null;
+  showHsqGuide(url, parcelId, false);
 }
 
 // ── LOCATE ───────────────────────────────────────────────────────────────────
@@ -799,6 +1010,7 @@ function parseKML(xml) {
   const byId = {};
   const thonLines = [];
   const thonLabels = [];
+  let hsqXaLink = '';
 
   pms.forEach(pm => {
     // Ranh thôn: bất kỳ Placemark nào có LineString (không phải thửa đất)
@@ -813,6 +1025,17 @@ function parseKML(xml) {
     }
 
     const name = (pm.querySelector('name')||{}).textContent||'';
+
+    // Điểm ghi chú Link HSQ Tổng của xã (do QGIS script TDMAP xuất ra, đứng NGOÀI mọi thửa) —
+    // nhận diện qua tên "HSQ Tổng", không thuộc mẫu Tờ-Thửa, không đưa vào danh sách thửa/nhãn thôn.
+    if (/HSQ\s*T[oổ]ng/i.test(name)) {
+      const descEl0 = pm.querySelector('description');
+      const desc0 = descEl0 ? (descEl0.textContent || '') : '';
+      const mLink = desc0.match(/https?:\/\/drive\.google\.com\S+/);
+      if (mLink && !hsqXaLink) hsqXaLink = mLink[0].replace(/&amp;/g,'&');
+      return;
+    }
+
     const idM = name.trim().match(/^(\d+[-–]\d+)/);
     const id  = idM ? idM[1].replace('–','-') : null;
 
@@ -866,7 +1089,7 @@ function parseKML(xml) {
       return aT!==bT ? aT-bT : aU-bU;
     });
 
-  return { parcels, ranhThon: { lines: thonLines, labels: thonLabels } };
+  return { parcels, ranhThon: { lines: thonLines, labels: thonLabels }, hsqXaLink };
 }
 
 // ── GEOJSON PARSER ────────────────────────────────────────────────────────────
@@ -882,6 +1105,7 @@ function parseGeoJSON(text) {
   const byId = {};
   const thonLines = [];
   const thonLabels = [];
+  let hsqXaLink = '';
 
   // GeoJSON dùng thứ tự [lon, lat] -> Leaflet cần [lat, lon]
   const toLatLngRing = (ring) => ring.map(c => [c[1], c[0]]);
@@ -890,6 +1114,12 @@ function parseGeoJSON(text) {
     const props = (f && f.properties) || {};
     const geom = f && f.geometry;
     if (!geom) return;
+
+    // --- Điểm ghi chú Link HSQ Tổng của xã (do QGIS script TDMAP xuất ra, đứng NGOÀI mọi thửa) ---
+    if (props.linkHSQXa) {
+      if (!hsqXaLink) hsqXaLink = String(props.linkHSQXa);
+      return;
+    }
 
     // --- Ranh thôn (đường) ---
     if (props.loai === 'ranh_thon') {
@@ -975,7 +1205,7 @@ function parseGeoJSON(text) {
       return aT!==bT ? aT-bT : aU-bU;
     });
 
-  return { parcels, ranhThon: { lines: thonLines, labels: thonLabels } };
+  return { parcels, ranhThon: { lines: thonLines, labels: thonLabels }, hsqXaLink };
 }
 // Render theo từng lô nhỏ (chunk) bằng requestAnimationFrame để nhường quyền
 // điều khiển cho trình duyệt giữa các lô -> tránh treo "Page Unresponsive"
@@ -1467,6 +1697,7 @@ function getKmlWorkerURL() {
       const byId = {};
       const thonLines = [];
       const thonLabels = [];
+      let hsqXaLink = '';
       pms.forEach(pm => {
         const lineEl = pm.querySelector('LineString coordinates');
         if (lineEl) {
@@ -1478,6 +1709,13 @@ function getKmlWorkerURL() {
           return;
         }
         const name = (pm.querySelector('name')||{}).textContent||'';
+        if (/HSQ\\s*T[oổ]ng/i.test(name)) {
+          const descEl0 = pm.querySelector('description');
+          const desc0 = descEl0 ? (descEl0.textContent || '') : '';
+          const mLink = desc0.match(/https?:\\/\\/drive\\.google\\.com\\S+/);
+          if (mLink && !hsqXaLink) hsqXaLink = mLink[0].replace(/&amp;/g,'&');
+          return;
+        }
         const idM = name.trim().match(/^(\\d+[-–]\\d+)/);
         const id  = idM ? idM[1].replace('–','-') : null;
         if (!id) {
@@ -1523,7 +1761,7 @@ function getKmlWorkerURL() {
           const [bT,bU] = b.id.split('-').map(Number);
           return aT!==bT ? aT-bT : aU-bU;
         });
-      return { parcels, ranhThon: { lines: thonLines, labels: thonLabels } };
+      return { parcels, ranhThon: { lines: thonLines, labels: thonLabels }, hsqXaLink };
     }
   `;
   return URL.createObjectURL(new Blob([workerSrc], { type: 'application/javascript' }));
@@ -1585,11 +1823,16 @@ function getGeoJsonWorkerURL() {
       const byId = {};
       const thonLines = [];
       const thonLabels = [];
+      let hsqXaLink = '';
       const toLatLngRing = (ring) => ring.map(c => [c[1], c[0]]);
       feats.forEach(f => {
         const props = (f && f.properties) || {};
         const geom = f && f.geometry;
         if (!geom) return;
+        if (props.linkHSQXa) {
+          if (!hsqXaLink) hsqXaLink = String(props.linkHSQXa);
+          return;
+        }
         if (props.loai === 'ranh_thon') {
           if (geom.type === 'LineString') {
             const pts = toLatLngRing(geom.coordinates || []);
@@ -1661,7 +1904,7 @@ function getGeoJsonWorkerURL() {
           const [bT,bU] = b.id.split('-').map(Number);
           return aT!==bT ? aT-bT : aU-bU;
         });
-      return { parcels, ranhThon: { lines: thonLines, labels: thonLabels } };
+      return { parcels, ranhThon: { lines: thonLines, labels: thonLabels }, hsqXaLink };
     }
   `;
   return URL.createObjectURL(new Blob([workerSrc], { type: 'application/javascript' }));
@@ -1733,6 +1976,9 @@ function handleFile(file) {
     }
 
     allParcels = result.parcels;
+    // Link HSQ Tổng của xã đọc được từ chính file vừa mở (nếu QGIS script TDMAP đã gắn sẵn) —
+    // reset về '' mỗi lần mở file mới để không giữ lại link của file trước đó.
+    currentFileHsqXaLink = result.hsqXaLink || '';
     await renderParcels(allParcels);
     renderRanhThon(result.ranhThon);
     document.getElementById('splash').style.display = 'none';
