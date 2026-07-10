@@ -3,7 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TDMAP.PRO.VN-100726_v2</title>
+<title>TDMAP.PRO.VN-110726</title>
+
+<!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI -->
+<!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
+<link rel="icon" href="app-icon.ico" type="image/x-icon">
+<link rel="shortcut icon" href="app-icon.ico" type="image/x-icon">
+<link rel="apple-touch-icon" href="app-icon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="app-icon.ico">
+<meta name="theme-color" content="#00c6a7">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TDMAP">
+<meta name="application-name" content="TDMAP">
+<link rel="manifest" href="manifest.json">
+
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; width: 100%; overflow: hidden;
@@ -435,12 +450,13 @@
 <div id="map"></div>
 
 <div id="logoWrap" style="
-  position:fixed; top:70px; right:10px; z-index:199;
-  background:rgba(10,18,28,0.82); backdrop-filter:blur(8px);
-  border:1px solid rgba(0,198,167,0.4); border-radius:8px;
-  padding:5px 10px; display:none;
+  position:fixed; top:10px; right:10px; z-index:1002;
+  background:#ffffff;
+  border:1px solid rgba(0,0,0,0.08); border-radius:10px;
+  padding:6px 12px; box-shadow:0 2px 10px rgba(0,0,0,0.15);
+  display:flex; align-items:center; gap:6px;
 ">
-  <span style="font-size:11px;font-weight:800;color:#00c6a7;letter-spacing:1.5px;">TDMAP.PRO.VN</span>
+  <span style="font-size:12px;font-weight:800;color:#00c6a7;letter-spacing:1.2px;">TDMAP.PRO.VN</span>
 </div>
 
 <div id="searchBar">
@@ -1280,14 +1296,16 @@ setLabelMinZoom(LABEL_MIN_ZOOM); // Đồng bộ nút active với giá trị kh
 function updateAllLabels() {
   const show = map.getZoom() >= LABEL_MIN_ZOOM;
   if (!show) {
-    allParcels.forEach(p => {
-      if (p._poly && p._lblBound) { p._poly.unbindTooltip(); p._lblBound = false; }
+    // Chỉ cần duyệt các thửa ĐANG có mặt trên bản đồ (renderedSet), không phải
+    // toàn bộ allParcels -> rất nhanh dù file có 30.000-50.000+ thửa.
+    renderedSet.forEach(p => {
+      if (p._lblBound) { p._poly.unbindTooltip(); p._lblBound = false; }
       if (p._dot && p._dotAdded) { map.removeLayer(p._dot); p._dotAdded = false; }
     });
     return;
   }
   const viewBounds = map.getBounds();
-  allParcels.forEach(p => {
+  renderedSet.forEach(p => {
     if (!p._poly || !p._lbl) return;
     const inView = p.lat != null && p.lon != null && viewBounds.contains([p.lat, p.lon]);
     if (inView) {
@@ -1298,6 +1316,191 @@ function updateAllLabels() {
       if (p._dot && p._dotAdded) { map.removeLayer(p._dot); p._dotAdded = false; }
     }
   });
+}
+
+// ── LƯỚI CHỈ MỤC KHÔNG GIAN (spatial grid) + VIEWPORT CULLING ──────────────────
+// Với file rất lớn (30.000-50.000+ thửa), giữ TẤT CẢ polygon trên Canvas cùng
+// lúc khiến trình duyệt phải vẽ lại toàn bộ ở mỗi khung hình khi pan/zoom ->
+// rất giật lag. Giải pháp: chia khu vực thành lưới ô nhỏ (GRID_CELL_DEG), chỉ
+// thêm vào bản đồ các thửa nằm trong (hoặc gần, có vùng đệm) khung nhìn hiện
+// tại; thửa ở xa được GỠ khỏi bản đồ nhưng vẫn giữ lại đối tượng Leaflet đã
+// tạo (poly/dot/tooltip) để dùng lại ngay khi người dùng quay lại khu vực đó,
+// không phải tạo mới từ đầu (đỡ tốn CPU).
+const GRID_CELL_DEG = 0.004;               // ~400m mỗi ô lưới
+let spatialGrid   = new Map();             // "latIdx_lonIdx" -> [thửa, ...]
+let renderedSet   = new Set();             // các thửa hiện đang có poly trên bản đồ
+const cellKeyOf = (i, j) => i + '_' + j;
+
+function computeParcelBBox(p) {
+  if (p.rings && p.rings.length) {
+    let minLat=Infinity, maxLat=-Infinity, minLon=Infinity, maxLon=-Infinity;
+    for (const ring of p.rings) {
+      for (let k=0; k<ring.length; k++) {
+        const la = ring[k][0], lo = ring[k][1];
+        if (la<minLat) minLat=la; if (la>maxLat) maxLat=la;
+        if (lo<minLon) minLon=lo; if (lo>maxLon) maxLon=lo;
+      }
+    }
+    p._minLat=minLat; p._maxLat=maxLat; p._minLon=minLon; p._maxLon=maxLon;
+  } else if (p.lat != null && p.lon != null) {
+    const eps = 0.0002; // thửa chỉ có điểm (không có ranh) -> tạo "ô" nhỏ quanh điểm
+    p._minLat=p.lat-eps; p._maxLat=p.lat+eps; p._minLon=p.lon-eps; p._maxLon=p.lon+eps;
+  }
+}
+
+function boxIntersects(p, minLat, maxLat, minLon, maxLon) {
+  return p._minLat != null &&
+    p._minLat <= maxLat && p._maxLat >= minLat &&
+    p._minLon <= maxLon && p._maxLon >= minLon;
+}
+
+// Xây lưới + tính sẵn bbox và chuỗi thường-không-dấu-hoa (cache) cho tìm kiếm,
+// tránh phải tính lại toLowerCase() cho 30.000-50.000 thửa mỗi lần gõ phím.
+function buildSpatialIndex(list) {
+  spatialGrid = new Map();
+  list.forEach(p => {
+    computeParcelBBox(p);
+    p._idLower = (p.id || '').toLowerCase();
+    p._tenChuLower = (p.tenChu || '').toLowerCase();
+    if (p._minLat == null) return;
+    const i0 = Math.floor(p._minLat/GRID_CELL_DEG), i1 = Math.floor(p._maxLat/GRID_CELL_DEG);
+    const j0 = Math.floor(p._minLon/GRID_CELL_DEG), j1 = Math.floor(p._maxLon/GRID_CELL_DEG);
+    for (let i=i0;i<=i1;i++) {
+      for (let j=j0;j<=j1;j++) {
+        const key = cellKeyOf(i,j);
+        let arr = spatialGrid.get(key);
+        if (!arr) { arr = []; spatialGrid.set(key, arr); }
+        arr.push(p);
+      }
+    }
+  });
+}
+
+// Tạo polygon + dot + tooltip cho 1 thửa (chỉ tạo 1 LẦN DUY NHẤT, tái sử dụng
+// mãi về sau kể cả khi bị gỡ khỏi bản đồ rồi thêm lại).
+function createParcelLayers(p) {
+  const poly = L.polygon(p.rings, {
+    renderer: mapCanvasRenderer,
+    color: '#ffff00', weight: 2.5,
+    fillColor: '#ffff00', fillOpacity: 0.06,
+    interactive: true, bubblingMouseEvents: false
+  });
+  poly.on('click tap', () => openPopup(p));
+
+  const dot = L.circleMarker([p.lat, p.lon], {
+    renderer: mapCanvasRenderer,
+    radius: 5, color: '#fff', weight: 1.5,
+    fillColor: '#1a6fd4', fillOpacity: 1,
+    interactive: true, bubblingMouseEvents: false
+  });
+  dot.on('click tap', () => openPopup(p));
+
+  const lblHtml = p.tenChu
+    ? `${escapeHtml(p.id)}<span class="lbl-owner">${escapeHtml(p.tenChu)}</span>`
+    : escapeHtml(p.id);
+  p._lbl = L.tooltip({
+    permanent: true, direction: 'center',
+    className: 'lbl-style', offset: [0, 0]
+  }).setContent(lblHtml);
+  p._lblBound = false;
+  p._dotAdded = false;
+  p._poly = poly;
+  p._dot  = dot;
+}
+
+// Đảm bảo 1 thửa có mặt trên bản đồ (tạo layer nếu chưa có, thêm lại nếu đã
+// bị gỡ trước đó). Dùng cho viewport-sync VÀ khi mở popup/tìm kiếm 1 thửa
+// đang ở ngoài khung nhìn hiện tại.
+function ensureParcelOnMap(p) {
+  if (!p.rings || !p.rings.length) return false;
+  if (!p._poly) createParcelLayers(p);
+  if (!p._onMap) {
+    p._poly.addTo(map);
+    p._onMap = true;
+    renderedSet.add(p);
+  }
+  return true;
+}
+
+function removeParcelFromMap(p) {
+  if (!p._onMap) return;
+  map.removeLayer(p._poly);
+  if (p._dotAdded) { map.removeLayer(p._dot); p._dotAdded = false; }
+  if (p._lblBound) { p._poly.unbindTooltip(); p._lblBound = false; }
+  p._onMap = false;
+  renderedSet.delete(p);
+}
+
+// Vùng đệm: THÊM thửa trong bán kính gần hơn (đỡ tạo dư), GỠ thửa chỉ khi ra
+// khỏi bán kính xa hơn nhiều (tránh nhấp nháy thêm/gỡ liên tục khi kéo qua lại
+// gần rìa khung nhìn).
+const VIEW_ADD_PAD    = 0.6;
+const VIEW_REMOVE_PAD = 1.4;
+let viewSyncTimer = null;
+
+function syncViewportLayers(showProgress) {
+  return new Promise(resolveSync => {
+    if (!allParcels.length) { resolveSync(); return; }
+    const b = map.getBounds();
+    const latSpan = b.getNorth() - b.getSouth(), lonSpan = b.getEast() - b.getWest();
+
+    const addMinLat = b.getSouth() - latSpan*VIEW_ADD_PAD, addMaxLat = b.getNorth() + latSpan*VIEW_ADD_PAD;
+    const addMinLon = b.getWest()  - lonSpan*VIEW_ADD_PAD, addMaxLon = b.getEast()  + lonSpan*VIEW_ADD_PAD;
+    const remMinLat = b.getSouth() - latSpan*VIEW_REMOVE_PAD, remMaxLat = b.getNorth() + latSpan*VIEW_REMOVE_PAD;
+    const remMinLon = b.getWest()  - lonSpan*VIEW_REMOVE_PAD, remMaxLon = b.getEast()  + lonSpan*VIEW_REMOVE_PAD;
+
+    // 1) Gỡ các thửa đã ra xa khung nhìn (giữ lại đối tượng Leaflet để tái dùng)
+    renderedSet.forEach(p => {
+      if (!boxIntersects(p, remMinLat, remMaxLat, remMinLon, remMaxLon)) removeParcelFromMap(p);
+    });
+
+    // 2) Gom ứng viên trong vùng đệm-thêm, chỉ quét các ô lưới liên quan
+    const i0 = Math.floor(addMinLat/GRID_CELL_DEG), i1 = Math.floor(addMaxLat/GRID_CELL_DEG);
+    const j0 = Math.floor(addMinLon/GRID_CELL_DEG), j1 = Math.floor(addMaxLon/GRID_CELL_DEG);
+    const candidates = new Set();
+    for (let i=i0;i<=i1;i++) {
+      for (let j=j0;j<=j1;j++) {
+        const arr = spatialGrid.get(cellKeyOf(i,j));
+        if (arr) for (let k=0;k<arr.length;k++) candidates.add(arr[k]);
+      }
+    }
+
+    const toAdd = [];
+    candidates.forEach(p => {
+      if (!p._onMap && boxIntersects(p, addMinLat, addMaxLat, addMinLon, addMaxLon)) toAdd.push(p);
+    });
+
+    if (toAdd.length === 0) { updateAllLabels(); resolveSync(); return; }
+
+    // Danh sách nhỏ (đa số các lần pan/zoom bình thường) -> thêm ngay, không cần chia lô
+    if (toAdd.length <= 400) {
+      for (let k=0;k<toAdd.length;k++) ensureParcelOnMap(toAdd[k]);
+      updateAllLabels();
+      resolveSync();
+      return;
+    }
+
+    // Danh sách lớn (lần tải file đầu tiên, khi khung nhìn còn bao trọn cả khu
+    // vực) -> chia lô nhỏ bằng requestIdleCallback/rAF để không treo giao diện.
+    let k = 0;
+    function step() {
+      const end = Math.min(k + RENDER_CHUNK_SIZE, toAdd.length);
+      for (; k < end; k++) ensureParcelOnMap(toAdd[k]);
+      if (showProgress) showStatus(`Đang tải ${k}/${toAdd.length} thửa...`);
+      if (k < toAdd.length) {
+        scheduleChunk(step);
+      } else {
+        updateAllLabels();
+        resolveSync();
+      }
+    }
+    step();
+  });
+}
+
+function scheduleViewportSync() {
+  clearTimeout(viewSyncTimer);
+  viewSyncTimer = setTimeout(() => syncViewportLayers(false), 120);
 }
 
 // Báo mức zoom hiện tại lên badge góc trên-trái (luôn hiển thị cố định,
@@ -1320,73 +1523,39 @@ function updateZoomBadge() {
 // chấm điểm (tốn nhiều tài nguyên hơn) chỉ xử lý khi zoom đã dừng hẳn
 // ('zoomend'/'moveend') để tránh giật lag khi đang kéo/zoom.
 map.on('zoom', updateZoomBadge);
-map.on('zoomend moveend', () => { updateAllLabels(); updateZoomBadge(); });
+// scheduleViewportSync() lo việc thêm/gỡ polygon theo khung nhìn (viewport
+// culling) - cần thiết để giữ mượt khi file có 30.000-50.000+ thửa; nó tự gọi
+// updateAllLabels() sau khi đồng bộ xong.
+map.on('zoomend moveend', () => { scheduleViewportSync(); updateZoomBadge(); });
 updateZoomBadge();
 
 function renderParcels(list) {
-  return new Promise(resolve => {
-    allLayers.forEach(l => map.removeLayer(l));
-    allLayers = [];
-    // Dùng L.latLngBounds().extend() thay vì gom mảng khổng lồ rồi spread
-    // (bounds.push(...array) có thể vượt giới hạn tham số của JS và làm
-    // trình duyệt treo cứng khi dữ liệu lớn).
-    const bounds = L.latLngBounds();
-    let i = 0;
+  // Gỡ toàn bộ layer đang hiển thị của lần tải trước (nếu có)
+  renderedSet.forEach(p => removeParcelFromMap(p));
+  renderedSet.clear();
 
-    function processChunk() {
-      const end = Math.min(i + RENDER_CHUNK_SIZE, list.length);
-
-      for (; i < end; i++) {
-        const p = list[i];
-        if (!p.rings.length) continue;
-
-        const poly = L.polygon(p.rings, {
-          renderer: mapCanvasRenderer,
-          color: '#ffff00', weight: 2.5,
-          fillColor: '#ffff00', fillOpacity: 0.06,
-          interactive: true, bubblingMouseEvents: false
-        }).addTo(map);
-
-        poly.on('click tap', () => openPopup(p));
-        for (const ring of p.rings) {
-          for (const pt of ring) bounds.extend(pt);
-        }
-
-        const dot = L.circleMarker([p.lat, p.lon], {
-          renderer: mapCanvasRenderer,
-          radius: 5, color: '#fff', weight: 1.5,
-          fillColor: '#1a6fd4', fillOpacity: 1,
-          interactive: true, bubblingMouseEvents: false
-        });
-        dot.on('click tap', () => openPopup(p));
-
-        const lblHtml = p.tenChu
-          ? `${escapeHtml(p.id)}<span class="lbl-owner">${escapeHtml(p.tenChu)}</span>`
-          : escapeHtml(p.id);
-        p._lbl = L.tooltip({
-          permanent: true, direction: 'center',
-          className: 'lbl-style', offset: [0, 0]
-        }).setContent(lblHtml);
-        p._lblBound = false;
-        p._dotAdded = false; // Chấm điểm chỉ được addTo(map) khi zoom đủ lớn (xem updateAllLabels)
-
-        allLayers.push(poly, dot);
-        p._poly = poly;
-        p._dot  = dot;
-      }
-
-      if (i < list.length) {
-        showStatus(`Đang tải ${i}/${list.length} thửa...`);
-        scheduleChunk(processChunk);
-      } else {
-        if (bounds.isValid()) map.fitBounds(bounds, { padding: [60,60], maxZoom: 17 });
-        updateAllLabels();
-        resolve();
-      }
+  // Tính bounds tổng thể trực tiếp từ tọa độ (KHÔNG cần tạo polygon trước) ->
+  // rất nhanh dù có 30.000-50.000+ thửa, vì chỉ là vòng lặp cộng dồn số học.
+  // Dùng bounds.extend() thay vì gom mảng khổng lồ rồi spread (có thể vượt
+  // giới hạn tham số của JS và làm trình duyệt treo cứng khi dữ liệu lớn).
+  const bounds = L.latLngBounds();
+  list.forEach(p => {
+    if (p.rings && p.rings.length) {
+      for (const ring of p.rings) for (const pt of ring) bounds.extend(pt);
+    } else if (p.lat != null && p.lon != null) {
+      bounds.extend([p.lat, p.lon]);
     }
-
-    processChunk();
   });
+
+  // Xây lưới chỉ mục không gian (cho viewport culling) + cache chuỗi tìm kiếm
+  buildSpatialIndex(list);
+
+  if (bounds.isValid()) map.fitBounds(bounds, { padding: [60,60], maxZoom: 17 });
+
+  // Chỉ vẽ các thửa trong khung nhìn (+ vùng đệm) hiện tại, theo từng lô nhỏ
+  // để không treo giao diện. Các thửa còn lại sẽ tự động được vẽ/gỡ khi
+  // người dùng pan/zoom (xem scheduleViewportSync ở trên).
+  return syncViewportLayers(true);
 }
 
 // ── RANH THÔN (ranh giới thôn/tổ dân phố) ───────────────────────────────────────
@@ -1424,6 +1593,11 @@ function openPopup(p) {
     activeP._poly.setStyle({ color:'#ffff00', weight:2.5, fillOpacity:0.06 });
 
   activeP = p;
+  // Đảm bảo thửa có mặt trên bản đồ dù đang ở ngoài khung nhìn hiện tại (vd:
+  // vừa chọn từ kết quả tìm kiếm ở khu vực chưa được vẽ tới) trước khi tô màu
+  // và bay camera đến, vì với viewport culling không phải thửa nào cũng luôn
+  // có sẵn polygon trên bản đồ.
+  ensureParcelOnMap(p);
   if (p._poly) p._poly.setStyle({ color:'#00ffcc', weight:3.5, fillOpacity:0.2 });
 
   document.getElementById('searchInput').value = p.id;
@@ -1504,15 +1678,28 @@ const MAX_SUGGESTIONS = 50;
 let currentMatches = [];
 
 function matchParcel(p, q) {
-  const idMatch   = p.id.toLowerCase().includes(q);
-  const nameMatch = !!(p.tenChu && p.tenChu.toLowerCase().includes(q));
+  // Dùng chuỗi thường đã tính sẵn (_idLower/_tenChuLower, xem buildSpatialIndex)
+  // thay vì gọi .toLowerCase() lại mỗi lần tìm -> nhanh hơn nhiều với
+  // 30.000-50.000+ thửa.
+  const idMatch   = (p._idLower != null ? p._idLower : p.id.toLowerCase()).includes(q);
+  const nameMatch = !!(p._tenChuLower && p._tenChuLower.includes(q));
   return idMatch || nameMatch;
 }
 
+let searchDebounceTimer = null;
 function onInputSearch() {
+  // Gõ nhanh trên file lớn (30.000-50.000+ thửa) mà lọc ngay mỗi phím bấm sẽ
+  // giật -> gom lại, chỉ lọc sau khi người dùng dừng gõ ~120ms.
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(runSearchFilter, 120);
+}
+
+function runSearchFilter() {
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   if (!q) {
-    allParcels.forEach(p => {
+    // Chỉ cần khôi phục màu cho các thửa ĐANG hiển thị trên bản đồ, không phải
+    // toàn bộ allParcels (những thửa chưa vẽ không có style gì để khôi phục).
+    renderedSet.forEach(p => {
       if (p._poly) p._poly.setStyle({ color:'#ffff00', fillOpacity:0.06 });
       if (p._dot)  p._dot.setStyle({ fillColor:'#1a6fd4', fillOpacity:1 });
     });
@@ -2005,7 +2192,6 @@ function handleFile(file) {
     await renderParcels(allParcels);
     renderRanhThon(result.ranhThon);
     document.getElementById('splash').style.display = 'none';
-    document.getElementById('logoWrap').style.display = 'block';
     const soThonLines = (result.ranhThon && result.ranhThon.lines) ? result.ranhThon.lines.length : 0;
     const thonNote = soThonLines > 0 ? ` (kèm ranh thôn)` : '';
     showStatus(`✓ ${allParcels.length} thửa${thonNote} – ${file.name}`);
