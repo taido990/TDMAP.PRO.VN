@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TDMAP.PRO.VN-100726</title>
+<title>TDMAP.PRO.VN-100726v1</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; width: 100%; overflow: hidden;
@@ -24,7 +24,7 @@
     box-shadow: 0 4px 15px rgba(0,0,0,0.15);
     width: 380px;
     max-width: calc(100vw - 30px);
-    transition: all 0.3s ease;
+    transition: top 0.15s ease;
   }
   #searchBar .logo { font-size: 13px; font-weight: 800; color: #00c6a7; letter-spacing: 1px; }
   #searchBar .divider { width: 1px; height: 18px; background: rgba(0,0,0,0.1); margin: 0 4px; }
@@ -142,12 +142,13 @@
     background: #ffc107; box-shadow: 0 0 6px rgba(255,193,7,.8);
   }
 
-  /* HÀNG CHỨA: CONTROL CHỌN NGƯỠNG ZOOM + NÚT HSQ XÃ (cùng 1 hàng) */
+  /* HÀNG CHỨA: CONTROL CHỌN NGƯỠNG ZOOM + NÚT HSQ XÃ (cùng 1 hàng, tự xuống dòng trên điện thoại) */
   #topControlsRow {
     position: fixed; top: 53px; left: 15px; z-index: 1001;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     max-width: calc(100vw - 30px);
   }
+  #hsqXaBtn { max-width: calc(100vw - 30px); }
   /* CONTROL CHỌN NGƯỚNG ZOOM HIỆN NHÃN */
   #labelZoomControl {
     display: flex; align-items: center; gap: 6px;
@@ -878,6 +879,28 @@ function locateMe() {
 }
 
 // ── MAP ───────────────────────────────────────────────────────────────────────
+// ── CHỐNG CHỒNG ĐÈ: tự căn lại vị trí thanh tìm kiếm theo chiều cao thật của hàng nút phía trên
+//    (nút "HSQ Ngoài Danh Sách" có thể xuống dòng trên màn hình điện thoại hẹp)
+function adjustTopLayout() {
+  const row = document.getElementById('topControlsRow');
+  const searchBar = document.getElementById('searchBar');
+  const suggestions = document.getElementById('searchSuggestions');
+  if (!row || !searchBar) return;
+  const rowRect = row.getBoundingClientRect();
+  const newTop = Math.round(rowRect.bottom + 10);
+  searchBar.style.top = newTop + 'px';
+  if (suggestions) {
+    const barRect = searchBar.getBoundingClientRect();
+    suggestions.style.top = Math.round(barRect.bottom + 8) + 'px';
+  }
+}
+window.addEventListener('load', adjustTopLayout);
+window.addEventListener('resize', adjustTopLayout);
+window.addEventListener('orientationchange', () => setTimeout(adjustTopLayout, 150));
+// Chạy ngay + lần nữa sau khi layout ổn định (webfont/icon có thể đổi kích thước nút)
+adjustTopLayout();
+setTimeout(adjustTopLayout, 300);
+
 const map = L.map('map', { zoomControl: false, attributionControl: false });
 L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
   { subdomains:'0123', maxZoom:22 }).addTo(map);
