@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TDMAP.PRO.VN-110726</title>
+<title>TDMAP.PRO.VN-110726_DK</title>
 
 <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI -->
 <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
@@ -1515,8 +1515,9 @@ function createParcelLayers(p) {
   });
   dot.on('click tap', () => openPopup(p));
 
-  const statusText = p.trangThaiDK ? (p.trangThaiDK === 'DDK' ? 'Đã ĐK' : 'Chưa ĐK') : '';
-  const ownerLine = [p.tenChu, statusText].filter(Boolean).join(' - ');
+  // Nhãn trên bản đồ: dòng 1 = Tờ-Thửa, dòng 2 = Tên chủ (không kèm trạng thái).
+  // Trạng thái đăng ký chỉ hiển thị khi click vào thửa (xem trong popup).
+  const ownerLine = p.tenChu || '';
   const lblHtml = ownerLine
     ? `${escapeHtml(p.id)}<span class="lbl-owner">${escapeHtml(ownerLine)}</span>`
     : escapeHtml(p.id);
