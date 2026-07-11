@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TDMAP.PRO.VN-110726</title>
+<title>TDMAP.PRO.VN-110726_DK</title>
 
 <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI -->
 <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
@@ -109,6 +109,13 @@
   }
   #loadBtn:active { opacity: 0.8; }
   #fileInput { display: none; }
+  #driveBtn {
+    background: #fff; border: 1px solid rgba(0,0,0,0.1); border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 8px 10px; cursor: pointer; flex-shrink: 0;
+    transition: opacity 0.2s, background 0.2s;
+  }
+  #driveBtn:active { opacity: 0.8; }
 
   /* NÚT VỊ TRÍ */
   #locateBtn {
@@ -217,6 +224,11 @@
   }
   #popupTitle { font-size: 17px; font-weight: 800; color: #111; margin-bottom: 2px; }
   #popupInfo { font-size: 13px; font-weight: 700; color: #cc4400; margin-bottom: 6px; line-height: 1.5; }
+  #popupInfo .popup-main-line { margin-bottom: 2px; }
+  #popupInfo .popup-owner-line { color: #1a6fd4; margin-bottom: 2px; }
+  #popupInfo .popup-status-line { display: inline-block; margin-top: 2px; padding: 1px 8px; border-radius: 4px; font-weight: 800; }
+  #popupInfo .popup-status-ddk { color: #ff1493; background: rgba(255,20,147,0.1); }
+  #popupInfo .popup-status-cdk { color: #cc0000; background: rgba(204,0,0,0.1); }
   #popupCoords { font-size: 10px; color: #aaa; margin-bottom: 10px; }
 
   .btn-row { display: flex; gap: 10px; }
@@ -309,6 +321,48 @@
   }
   .hsq-guide-example { display: block; color: #0d47a1; font-weight: 700; font-size: 11.5px; margin-top: 2px; white-space: nowrap; }
 
+  /* ── MODAL: MỞ FILE .GEOJSON TỪ GOOGLE DRIVE ─────────────────────────────── */
+  .drive-field-label {
+    font-size: 12px; font-weight: 700; color: #666;
+    margin: 10px 0 4px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .drive-field-label:first-child { margin-top: 0; }
+  .drive-help-link { font-size: 11px; font-weight: 700; color: #1a6fd4; text-decoration: none; }
+  #driveApiKeyInput, #driveFolderInput {
+    width: 100%; box-sizing: border-box;
+    border: 1.5px solid rgba(0,0,0,0.15); border-radius: 8px;
+    padding: 10px 12px; font-size: 13.5px; color: #222;
+    outline: none;
+  }
+  #driveApiKeyInput:focus, #driveFolderInput:focus { border-color: #00c6a7; }
+  .drive-remember-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 8px; font-size: 12px; color: #777;
+  }
+  #driveListBtn {
+    margin-top: 12px; width: 100%; border: none; border-radius: 8px;
+    background: #00c6a7; color: #fff; font-weight: 700; font-size: 13px;
+    padding: 10px; cursor: pointer;
+  }
+  #driveListBtn:active { filter: brightness(.85); }
+  #driveListBtn:disabled { opacity: .6; }
+  #driveStatusMsg { font-size: 12.5px; color: #888; margin-top: 10px; text-align: center; }
+  #driveStatusMsg.error { color: #d9534f; }
+  #driveFileList { margin-top: 10px; max-height: 240px; overflow-y: auto; }
+  .drive-file-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 8px; border-radius: 8px; cursor: pointer;
+    border: 1px solid #eee; margin-bottom: 6px;
+    transition: background .15s;
+  }
+  .drive-file-item:active { background: #f0faf8; }
+  .drive-file-item .dfi-icon { font-size: 18px; flex-shrink: 0; }
+  .drive-file-item .dfi-name {
+    flex: 1; font-size: 13px; color: #333; font-weight: 600;
+    word-break: break-all;
+  }
+  .drive-file-item .dfi-go { font-size: 12px; color: #00c6a7; font-weight: 700; flex-shrink: 0; }
+
   /* SPLASH */
   #splash {
     position: fixed; inset: 0; z-index: 1000; background: #ffffff;
@@ -324,6 +378,11 @@
     transition: background .2s;
   }
   #splash .circle:active { background: rgba(0,198,167,0.25); }
+  #splash .circle-row { display: flex; align-items: flex-start; gap: 30px; }
+  #splash .circle-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  #splash .circle-label { font-size: 12px; font-weight: 700; color: #666; }
+  #splash .circle.drive { border-color: #1a6fd4; background: rgba(26,111,212,0.1); }
+  #splash .circle.drive:active { background: rgba(26,111,212,0.22); }
   #splash h2 { font-size: 17px; font-weight: 700; color: #111; }
   #splash p  { font-size: 13px; color: #555; text-align: center; padding: 0 36px; line-height: 1.7; }
 
@@ -442,7 +501,16 @@
 
 <div id="splash">
   <div class="brand">TDMAP.PRO.VN</div>
-  <div class="circle" onclick="document.getElementById('fileInput').click()">📂</div>
+  <div class="circle-row">
+    <div class="circle-item">
+      <div class="circle" onclick="document.getElementById('fileInput').click()">📂</div>
+      <span class="circle-label">Từ máy</span>
+    </div>
+    <div class="circle-item">
+      <div class="circle drive" onclick="openDriveModal()"><svg width="34" height="34" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><polygon points="50,6 6,88 50,60" fill="#2684FC"/><polygon points="50,6 50,60 94,88" fill="#00AC47"/><polygon points="6,88 94,88 50,60" fill="#FFBA00"/></svg></div>
+      <span class="circle-label">Google Drive</span>
+    </div>
+  </div>
   <h2>Tải file bản đồ lên</h2>
   <p>Chọn file .kml hoặc .geojson xuất từ QGIS script TDMAP<br>để xem ranh thửa trên ảnh vệ tinh</p>
 </div>
@@ -465,6 +533,7 @@
   <input id="searchInput" type="search" placeholder="Nhập Tờ-Thửa hoặc Tên chủ..." autocomplete="off" oninput="onInputSearch()" onkeydown="if(event.key==='Enter') executeSearch()" onfocus="onInputSearch()">
   <button id="searchBtn" onclick="executeSearch()" title="Tìm kiếm thửa đất">🔍</button>
   <button id="loadBtn" onclick="document.getElementById('fileInput').click()">📂 Mở file</button>
+  <button id="driveBtn" onclick="openDriveModal()" title="Mở file .geojson từ Google Drive"><svg width="15" height="15" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;"><polygon points="50,6 6,88 50,60" fill="#2684FC"/><polygon points="50,6 50,60 94,88" fill="#00AC47"/><polygon points="6,88 94,88 50,60" fill="#FFBA00"/></svg></button>
 </div>
 <div id="searchSuggestions"></div>
 <input type="file" id="fileInput" accept=".kml,.geojson,application/vnd.google-earth.kml+xml,application/geo+json,application/json" onchange="handleFile(this.files[0])">
@@ -580,6 +649,32 @@
       <button id="hsqGuideChangeBtn" class="modal-btn ghost" style="display:none;" onclick="changeHsqXaLink()">✎ Đổi link</button>
       <button class="modal-btn secondary" onclick="closeHsqGuide()">Đóng</button>
       <button class="modal-btn primary" onclick="confirmOpenHsq()">📁 Mở thư mục HSQ</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: MỞ FILE .GEOJSON TỪ GOOGLE DRIVE -->
+<div id="driveModalOverlay" class="modal-overlay">
+  <div class="modal-box" style="max-width:380px;">
+    <div class="modal-header"><svg width="18" height="18" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;margin-right:4px;"><polygon points="50,6 6,88 50,60" fill="#2684FC"/><polygon points="50,6 50,60 94,88" fill="#00AC47"/><polygon points="6,88 94,88 50,60" fill="#FFBA00"/></svg> Mở file .geojson từ Google Drive</div>
+    <div class="modal-body">
+      <input id="driveApiKeyInput" type="hidden">
+
+      <div class="drive-field-label"><span>Link thư mục Google Drive</span></div>
+      <input id="driveFolderInput" type="text" placeholder="https://drive.google.com/drive/folders/...">
+
+      <label class="drive-remember-row">
+        <input type="checkbox" id="driveRememberChk" checked style="margin:0;">
+        Ghi nhớ thư mục cho lần mở sau
+      </label>
+
+      <button id="driveListBtn" onclick="listDriveGeojsonFiles()">🔍 Tải danh sách file .geojson</button>
+      <div id="driveStatusMsg" style="display:none;"></div>
+      <div id="driveFileList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn ghost" onclick="clearDriveSettings()">Xóa thiết lập</button>
+      <button class="modal-btn secondary" onclick="closeDriveModal()">Đóng</button>
     </div>
   </div>
 </div>
@@ -965,11 +1060,18 @@ let ranhThonLayers = [];
 // Dùng chung cho cả KML (name/label placemark) và GeoJSON (properties.label)
 // khi các trường riêng lẻ không có sẵn.
 function parseLabelCompound(label, id) {
-  const out = { dienTich: '', loaiDat: '', tenChu: '' };
+  const out = { dienTich: '', loaiDat: '', tenChu: '', trangThaiDK: '' };
   if (!label || !id) return out;
   const prefix = id + '-';
   if (!label.startsWith(prefix)) return out;
-  const rest = label.slice(prefix.length);
+  let rest = label.slice(prefix.length);
+  // Trạng thái đăng ký (CDK/DDK) luôn là đoạn cuối cùng của label nếu có -
+  // tách ra trước để không bị lẫn vào tên chủ.
+  const mStatus = rest.match(/-(CDK|DDK)$/i);
+  if (mStatus) {
+    out.trangThaiDK = mStatus[1].toUpperCase();
+    rest = rest.slice(0, rest.length - mStatus[0].length);
+  }
   const m = rest.match(/^([\d.,]+)-([A-Za-zÀ-ỹ+]+)(?:-(.+))?$/);
   if (m) {
     out.dienTich = m[1] || '';
@@ -1018,20 +1120,23 @@ function parseDescFields(desc) {
 // thử lần lượt: ExtendedData -> chuỗi name gộp -> description. Chỉ điền
 // vào những trường còn thiếu (không ghi đè dữ liệu đã có).
 function enrichParcelFromKmlPlacemark(p, pm, name, id) {
-  if (p.dienTich && p.loaiDat && p.tenChu) return;
+  if (p.dienTich && p.loaiDat && p.tenChu && p.trangThaiDK) return;
   const ext = extractKmlExtendedData(pm);
   const dt = pickField(ext, ['dientich', 'dien_tich', 'area', 'dt', 'dientich(m2)']);
   const ld = pickField(ext, ['loaidat', 'loai_dat', 'landtype', 'ld', 'loai']);
   const tc = pickField(ext, ['tenchu', 'ten_chu', 'owner', 'chusd', 'chusudung', 'chu_su_dung']);
+  const tt = pickField(ext, ['trangthaidk', 'trang_thai_dk', 'trangthai', 'tranthaidk']);
   if (!p.dienTich && dt) p.dienTich = dt;
   if (!p.loaiDat && ld) p.loaiDat = ld;
   if (!p.tenChu && tc) p.tenChu = tc;
+  if (!p.trangThaiDK && tt) p.trangThaiDK = tt.toUpperCase();
 
-  if (!p.dienTich || !p.loaiDat) {
+  if (!p.dienTich || !p.loaiDat || !p.trangThaiDK) {
     const lc = parseLabelCompound(name.trim(), id);
     if (!p.dienTich && lc.dienTich) p.dienTich = lc.dienTich;
     if (!p.loaiDat && lc.loaiDat) p.loaiDat = lc.loaiDat;
     if (!p.tenChu && lc.tenChu) p.tenChu = lc.tenChu;
+    if (!p.trangThaiDK && lc.trangThaiDK) p.trangThaiDK = lc.trangThaiDK;
   }
 
   if (!p.dienTich || !p.loaiDat || !p.tenChu) {
@@ -1089,7 +1194,7 @@ function parseKML(xml) {
       return;
     }
 
-    if (!byId[id]) byId[id] = { id, lat:null, lon:null, linkHSQ:'', dienTich:'', loaiDat:'', tenChu:'', chiDuong:'', rings:[] };
+    if (!byId[id]) byId[id] = { id, lat:null, lon:null, linkHSQ:'', dienTich:'', loaiDat:'', tenChu:'', trangThaiDK:'', chiDuong:'', rings:[] };
     const p = byId[id];
     enrichParcelFromKmlPlacemark(p, pm, name, id);
 
@@ -1194,7 +1299,7 @@ function parseGeoJSON(text) {
     if (!id) return;
     id = id.replace('–', '-');
 
-    if (!byId[id]) byId[id] = { id, lat: null, lon: null, linkHSQ: '', dienTich: '', loaiDat: '', tenChu: '', chiDuong: '', rings: [] };
+    if (!byId[id]) byId[id] = { id, lat: null, lon: null, linkHSQ: '', dienTich: '', loaiDat: '', tenChu: '', trangThaiDK: '', chiDuong: '', rings: [] };
     const p = byId[id];
 
     // Bổ sung dienTich/loaiDat/tenChu: ưu tiên các trường riêng lẻ do QGIS
@@ -1202,11 +1307,13 @@ function parseGeoJSON(text) {
     if (props.dienTich != null && props.dienTich !== '' && !p.dienTich) p.dienTich = String(props.dienTich);
     if (props.loaiDat && !p.loaiDat) p.loaiDat = String(props.loaiDat);
     if (props.tenChu && !p.tenChu) p.tenChu = String(props.tenChu);
-    if ((!p.dienTich || !p.loaiDat || !p.tenChu) && props.label) {
+    if (props.trangThaiDK && !p.trangThaiDK) p.trangThaiDK = String(props.trangThaiDK).trim().toUpperCase();
+    if ((!p.dienTich || !p.loaiDat || !p.tenChu || !p.trangThaiDK) && props.label) {
       const lc = parseLabelCompound(String(props.label), id);
       if (!p.dienTich && lc.dienTich) p.dienTich = lc.dienTich;
       if (!p.loaiDat && lc.loaiDat) p.loaiDat = lc.loaiDat;
       if (!p.tenChu && lc.tenChu) p.tenChu = lc.tenChu;
+      if (!p.trangThaiDK && lc.trangThaiDK) p.trangThaiDK = lc.trangThaiDK;
     }
     if (props.chiDuong && !p.chiDuong) p.chiDuong = String(props.chiDuong);
 
@@ -1376,13 +1483,25 @@ function buildSpatialIndex(list) {
   });
 }
 
+// Màu tô ranh thửa theo Trạng thái đăng ký (trường 'trangThaiDK'):
+// - 'DDK' (Đã đăng ký / đã kê khai...)  -> HỒNG
+// - 'CDK' (Chưa đăng ký) hoặc không có  -> VÀNG (như trước)
+function getParcelColor(p) {
+  return (p && p.trangThaiDK === 'DDK') ? '#ff1493' : '#ffff00';
+}
+// Bản mờ (dùng khi lọc tìm kiếm, thửa không khớp) - giữ cùng tông màu, chỉ giảm alpha.
+function getParcelDimColor(p) {
+  return (p && p.trangThaiDK === 'DDK') ? '#ff149333' : '#ffff0033';
+}
+
 // Tạo polygon + dot + tooltip cho 1 thửa (chỉ tạo 1 LẦN DUY NHẤT, tái sử dụng
 // mãi về sau kể cả khi bị gỡ khỏi bản đồ rồi thêm lại).
 function createParcelLayers(p) {
+  const baseColor = getParcelColor(p);
   const poly = L.polygon(p.rings, {
     renderer: mapCanvasRenderer,
-    color: '#ffff00', weight: 2.5,
-    fillColor: '#ffff00', fillOpacity: 0.06,
+    color: baseColor, weight: 2.5,
+    fillColor: baseColor, fillOpacity: 0.06,
     interactive: true, bubblingMouseEvents: false
   });
   poly.on('click tap', () => openPopup(p));
@@ -1395,8 +1514,10 @@ function createParcelLayers(p) {
   });
   dot.on('click tap', () => openPopup(p));
 
-  const lblHtml = p.tenChu
-    ? `${escapeHtml(p.id)}<span class="lbl-owner">${escapeHtml(p.tenChu)}</span>`
+  const statusText = p.trangThaiDK ? (p.trangThaiDK === 'DDK' ? 'Đã ĐK' : 'Chưa ĐK') : '';
+  const ownerLine = [p.tenChu, statusText].filter(Boolean).join(' - ');
+  const lblHtml = ownerLine
+    ? `${escapeHtml(p.id)}<span class="lbl-owner">${escapeHtml(ownerLine)}</span>`
     : escapeHtml(p.id);
   p._lbl = L.tooltip({
     permanent: true, direction: 'center',
@@ -1590,7 +1711,7 @@ function renderRanhThon(ranhThon) {
 function openPopup(p) {
   hideSuggestions();
   if (activeP && activeP._poly)
-    activeP._poly.setStyle({ color:'#ffff00', weight:2.5, fillOpacity:0.06 });
+    activeP._poly.setStyle({ color:getParcelColor(activeP), weight:2.5, fillOpacity:0.06 });
 
   activeP = p;
   // Đảm bảo thửa có mặt trên bản đồ dù đang ở ngoài khung nhìn hiện tại (vd:
@@ -1604,13 +1725,24 @@ function openPopup(p) {
 
   document.getElementById('popupTitle').textContent  = 'Tờ-Thửa ' + p.id;
 
-  // Dòng thông tin chi tiết: Tờ, Thửa, Diện tích, Loại đất, Tên chủ (nếu có)
+  // Dòng 1: Tờ, Thửa, Diện tích, Loại đất (nếu có)
   const [toNum, thuaNum] = p.id.split('-');
   const infoParts = [`Tờ: ${toNum}`, `Thửa: ${thuaNum}`];
   if (p.dienTich) infoParts.push(`Diện tích: ${p.dienTich}`);
   if (p.loaiDat) infoParts.push(`Loại đất: ${p.loaiDat}`);
-  if (p.tenChu) infoParts.push(`Tên chủ: ${p.tenChu}`);
-  document.getElementById('popupInfo').textContent = infoParts.join(', ');
+
+  // Dòng riêng: Tên chủ (nếu có)
+  const ownerLineHtml = p.tenChu
+    ? `<div class="popup-owner-line">Tên chủ: ${escapeHtml(p.tenChu)}</div>`
+    : '';
+
+  // Dòng riêng: Trạng thái đăng ký (nếu có)
+  const statusLineHtml = p.trangThaiDK
+    ? `<div class="popup-status-line popup-status-${p.trangThaiDK === 'DDK' ? 'ddk' : 'cdk'}">Trạng thái: ${p.trangThaiDK === 'DDK' ? 'Đã đăng ký (DDK)' : 'Chưa đăng ký (CDK)'}</div>`
+    : '';
+
+  document.getElementById('popupInfo').innerHTML =
+    `<div class="popup-main-line">${escapeHtml(infoParts.join(', '))}</div>${ownerLineHtml}${statusLineHtml}`;
 
   document.getElementById('popupCoords').textContent =
     `${(p.lat||0).toFixed(7)}, ${(p.lon||0).toFixed(7)}`;
@@ -1652,7 +1784,7 @@ function openPopup(p) {
 function closePopup() {
   document.getElementById('popup').classList.remove('open');
   if (activeP && activeP._poly)
-    activeP._poly.setStyle({ color:'#ffff00', weight:2.5, fillOpacity:0.06 });
+    activeP._poly.setStyle({ color:getParcelColor(activeP), weight:2.5, fillOpacity:0.06 });
   activeP = null;
 }
 
@@ -1700,7 +1832,7 @@ function runSearchFilter() {
     // Chỉ cần khôi phục màu cho các thửa ĐANG hiển thị trên bản đồ, không phải
     // toàn bộ allParcels (những thửa chưa vẽ không có style gì để khôi phục).
     renderedSet.forEach(p => {
-      if (p._poly) p._poly.setStyle({ color:'#ffff00', fillOpacity:0.06 });
+      if (p._poly) p._poly.setStyle({ color:getParcelColor(p), fillOpacity:0.06 });
       if (p._dot)  p._dot.setStyle({ fillColor:'#1a6fd4', fillOpacity:1 });
     });
     hideSuggestions();
@@ -1711,7 +1843,7 @@ function runSearchFilter() {
   allParcels.forEach(p => {
     const isPartial = matchParcel(p, q);
     if (p._poly) {
-      p._poly.setStyle({ color: isPartial ? '#00ffcc' : '#ffff0033', fillOpacity: isPartial ? 0.2 : 0.02 });
+      p._poly.setStyle({ color: isPartial ? '#00ffcc' : getParcelDimColor(p), fillOpacity: isPartial ? 0.2 : 0.02 });
     }
     if (p._dot) {
       p._dot.setStyle({ fillColor: isPartial ? '#00c6a7' : '#1a6fd4', fillOpacity: isPartial ? 1 : 0.2 });
@@ -1837,11 +1969,16 @@ function getKmlWorkerURL() {
       }
     };
     function parseLabelCompound(label, id) {
-      const out = { dienTich: '', loaiDat: '', tenChu: '' };
+      const out = { dienTich: '', loaiDat: '', tenChu: '', trangThaiDK: '' };
       if (!label || !id) return out;
       const prefix = id + '-';
       if (!label.startsWith(prefix)) return out;
-      const rest = label.slice(prefix.length);
+      let rest = label.slice(prefix.length);
+      const mStatus = rest.match(/-(CDK|DDK)$/i);
+      if (mStatus) {
+        out.trangThaiDK = mStatus[1].toUpperCase();
+        rest = rest.slice(0, rest.length - mStatus[0].length);
+      }
       const m = rest.match(/^([\\d.,]+)-([A-Za-zÀ-ỹ+]+)(?:-(.+))?$/);
       if (m) {
         out.dienTich = m[1] || '';
@@ -1879,19 +2016,22 @@ function getKmlWorkerURL() {
       return out;
     }
     function enrichParcelFromKmlPlacemark(p, pm, name, id) {
-      if (p.dienTich && p.loaiDat && p.tenChu) return;
+      if (p.dienTich && p.loaiDat && p.tenChu && p.trangThaiDK) return;
       const ext = extractKmlExtendedData(pm);
       const dt = pickField(ext, ['dientich', 'dien_tich', 'area', 'dt']);
       const ld = pickField(ext, ['loaidat', 'loai_dat', 'landtype', 'ld', 'loai']);
       const tc = pickField(ext, ['tenchu', 'ten_chu', 'owner', 'chusd', 'chusudung', 'chu_su_dung']);
+      const tt = pickField(ext, ['trangthaidk', 'trang_thai_dk', 'trangthai', 'tranthaidk']);
       if (!p.dienTich && dt) p.dienTich = dt;
       if (!p.loaiDat && ld) p.loaiDat = ld;
       if (!p.tenChu && tc) p.tenChu = tc;
-      if (!p.dienTich || !p.loaiDat) {
+      if (!p.trangThaiDK && tt) p.trangThaiDK = tt.toUpperCase();
+      if (!p.dienTich || !p.loaiDat || !p.trangThaiDK) {
         const lc = parseLabelCompound(name.trim(), id);
         if (!p.dienTich && lc.dienTich) p.dienTich = lc.dienTich;
         if (!p.loaiDat && lc.loaiDat) p.loaiDat = lc.loaiDat;
         if (!p.tenChu && lc.tenChu) p.tenChu = lc.tenChu;
+        if (!p.trangThaiDK && lc.trangThaiDK) p.trangThaiDK = lc.trangThaiDK;
       }
       if (!p.dienTich || !p.loaiDat || !p.tenChu) {
         const descEl = pm.querySelector('description');
@@ -1937,7 +2077,7 @@ function getKmlWorkerURL() {
           }
           return;
         }
-        if (!byId[id]) byId[id] = { id, lat:null, lon:null, linkHSQ:'', dienTich:'', loaiDat:'', tenChu:'', chiDuong:'', rings:[] };
+        if (!byId[id]) byId[id] = { id, lat:null, lon:null, linkHSQ:'', dienTich:'', loaiDat:'', tenChu:'', trangThaiDK:'', chiDuong:'', rings:[] };
         const p = byId[id];
         enrichParcelFromKmlPlacemark(p, pm, name, id);
         pm.querySelectorAll('Polygon outerBoundaryIs LinearRing coordinates').forEach(el => {
@@ -2014,11 +2154,16 @@ function getGeoJsonWorkerURL() {
       }
     };
     function parseLabelCompound(label, id) {
-      const out = { dienTich: '', loaiDat: '', tenChu: '' };
+      const out = { dienTich: '', loaiDat: '', tenChu: '', trangThaiDK: '' };
       if (!label || !id) return out;
       const prefix = id + '-';
       if (!label.startsWith(prefix)) return out;
-      const rest = label.slice(prefix.length);
+      let rest = label.slice(prefix.length);
+      const mStatus = rest.match(/-(CDK|DDK)$/i);
+      if (mStatus) {
+        out.trangThaiDK = mStatus[1].toUpperCase();
+        rest = rest.slice(0, rest.length - mStatus[0].length);
+      }
       const m = rest.match(/^([\\d.,]+)-([A-Za-zÀ-ỹ+]+)(?:-(.+))?$/);
       if (m) {
         out.dienTich = m[1] || '';
@@ -2071,16 +2216,18 @@ function getGeoJsonWorkerURL() {
         }
         if (!id) return;
         id = id.replace('–', '-');
-        if (!byId[id]) byId[id] = { id, lat: null, lon: null, linkHSQ: '', dienTich: '', loaiDat: '', tenChu: '', chiDuong: '', rings: [] };
+        if (!byId[id]) byId[id] = { id, lat: null, lon: null, linkHSQ: '', dienTich: '', loaiDat: '', tenChu: '', trangThaiDK: '', chiDuong: '', rings: [] };
         const p = byId[id];
         if (props.dienTich != null && props.dienTich !== '' && !p.dienTich) p.dienTich = String(props.dienTich);
         if (props.loaiDat && !p.loaiDat) p.loaiDat = String(props.loaiDat);
         if (props.tenChu && !p.tenChu) p.tenChu = String(props.tenChu);
-        if ((!p.dienTich || !p.loaiDat || !p.tenChu) && props.label) {
+        if (props.trangThaiDK && !p.trangThaiDK) p.trangThaiDK = String(props.trangThaiDK).trim().toUpperCase();
+        if ((!p.dienTich || !p.loaiDat || !p.tenChu || !p.trangThaiDK) && props.label) {
           const lc = parseLabelCompound(String(props.label), id);
           if (!p.dienTich && lc.dienTich) p.dienTich = lc.dienTich;
           if (!p.loaiDat && lc.loaiDat) p.loaiDat = lc.loaiDat;
           if (!p.tenChu && lc.tenChu) p.tenChu = lc.tenChu;
+          if (!p.trangThaiDK && lc.trangThaiDK) p.trangThaiDK = lc.trangThaiDK;
         }
         if (props.chiDuong && !p.chiDuong) p.chiDuong = String(props.chiDuong);
         if (geom.type === 'Polygon') {
@@ -2170,33 +2317,179 @@ function handleFile(file) {
   }
   const r = new FileReader();
   r.onload = async e => {
-    const text = e.target.result;
-    const isGeoJSON = detectIsGeoJSON(file.name, text);
-    showStatus(isGeoJSON ? 'Đang phân tích dữ liệu GeoJSON...' : 'Đang phân tích dữ liệu KML...');
+    await processMapText(e.target.result, file.name);
+  };
+  r.readAsText(file, 'UTF-8');
+}
 
-    let result;
-    try {
-      result = isGeoJSON ? await parseGeoJSONAsync(text) : await parseKMLAsync(text);
-    } catch (err) {
-      showAlert(
-        `Không thể đọc file này (${file.name}).\n` +
-        `Vui lòng kiểm tra đây là file .kml hoặc .geojson hợp lệ do TDMAP xuất ra.\n\nChi tiết lỗi: ${err}`
-      );
+// ── XỬ LÝ DÙNG CHUNG: nhận nội dung text (KML/GeoJSON) + tên file, render lên bản đồ.
+// Dùng chung cho cả file mở từ máy (handleFile) và file tải về từ Google Drive.
+async function processMapText(text, fileName) {
+  const isGeoJSON = detectIsGeoJSON(fileName, text);
+  showStatus(isGeoJSON ? 'Đang phân tích dữ liệu GeoJSON...' : 'Đang phân tích dữ liệu KML...');
+
+  let result;
+  try {
+    result = isGeoJSON ? await parseGeoJSONAsync(text) : await parseKMLAsync(text);
+  } catch (err) {
+    showAlert(
+      `Không thể đọc file này (${fileName}).\n` +
+      `Vui lòng kiểm tra đây là file .kml hoặc .geojson hợp lệ do TDMAP xuất ra.\n\nChi tiết lỗi: ${err}`
+    );
+    return false;
+  }
+
+  allParcels = result.parcels;
+  // Link HSQ Tổng của xã đọc được từ chính file vừa mở (nếu QGIS script TDMAP đã gắn sẵn) —
+  // reset về '' mỗi lần mở file mới để không giữ lại link của file trước đó.
+  currentFileHsqXaLink = result.hsqXaLink || '';
+  await renderParcels(allParcels);
+  renderRanhThon(result.ranhThon);
+  document.getElementById('splash').style.display = 'none';
+  const soThonLines = (result.ranhThon && result.ranhThon.lines) ? result.ranhThon.lines.length : 0;
+  const thonNote = soThonLines > 0 ? ` (kèm ranh thôn)` : '';
+  showStatus(`✓ ${allParcels.length} thửa${thonNote} – ${fileName}`);
+  return true;
+}
+
+// ── MỞ FILE .GEOJSON TỪ GOOGLE DRIVE ───────────────────────────────────────────
+// Ghi chú: Google Drive API v3 luôn cần một API Key hợp lệ để liệt kê/tải nội dung
+// file bằng JavaScript phía trình duyệt — kể cả khi thư mục đã ở chế độ
+// "Bất kỳ ai có đường liên kết". Người dùng tự tạo API Key miễn phí tại
+// Google Cloud Console (bật "Google Drive API"), dán vào ô bên dưới 1 lần,
+// TDMAP sẽ ghi nhớ (localStorage) cho các lần mở sau.
+const GDRIVE_KEY_STORAGE = 'tdmap_gdrive_apikey_v1';
+const GDRIVE_FOLDER_STORAGE = 'tdmap_gdrive_folder_v1';
+// Dán API Key thật (dạng AIzaSy...) vào đây để tự động điền sẵn cho mọi người dùng,
+// không cần tự nhập tay ở mỗi máy/trình duyệt.
+const GDRIVE_DEFAULT_APIKEY = 'AIzaSyAZn4KyQwzy61JwoJL6Vcjs13wdAa00zsw';
+const GDRIVE_DEFAULT_FOLDER = 'https://drive.google.com/drive/folders/1R60HGQu7PsU1sdr3PiDtkuWXtat7does?usp=drive_link';
+try { localStorage.removeItem(GDRIVE_KEY_STORAGE); } catch (e) {} // dọn key cũ (không còn dùng đến)
+
+function extractDriveFolderId(url) {
+  if (!url) return null;
+  const s = url.trim();
+  // Chấp nhận cả link đầy đủ (folders/ID) lẫn khi người dùng dán thẳng ID.
+  const m = s.match(/\/folders\/([a-zA-Z0-9_-]+)/) || s.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  if (/^[a-zA-Z0-9_-]{15,}$/.test(s)) return s; // có thể người dùng dán thẳng ID
+  return null;
+}
+
+function openDriveModal() {
+  const keyInput = document.getElementById('driveApiKeyInput');
+  const folderInput = document.getElementById('driveFolderInput');
+  keyInput.value = GDRIVE_DEFAULT_APIKEY; // luôn dùng API Key gắn sẵn trong code, không hỏi người dùng
+  folderInput.value = localStorage.getItem(GDRIVE_FOLDER_STORAGE) || GDRIVE_DEFAULT_FOLDER;
+  document.getElementById('driveFileList').innerHTML = '';
+  setDriveStatus('');
+  document.getElementById('driveModalOverlay').classList.add('show');
+  // Tự động liệt kê file ngay khi mở modal, không cần bấm nút.
+  if (folderInput.value.trim()) {
+    listDriveGeojsonFiles();
+  }
+}
+function closeDriveModal() {
+  document.getElementById('driveModalOverlay').classList.remove('show');
+}
+function clearDriveSettings() {
+  localStorage.removeItem(GDRIVE_FOLDER_STORAGE);
+  document.getElementById('driveApiKeyInput').value = GDRIVE_DEFAULT_APIKEY;
+  document.getElementById('driveFolderInput').value = GDRIVE_DEFAULT_FOLDER;
+  document.getElementById('driveFileList').innerHTML = '';
+  setDriveStatus('');
+  showStatus('Đã xóa thiết lập Google Drive đã lưu');
+}
+function setDriveStatus(msg, isError) {
+  const el = document.getElementById('driveStatusMsg');
+  if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+  el.style.display = 'block';
+  el.textContent = msg;
+  el.classList.toggle('error', !!isError);
+}
+
+async function listDriveGeojsonFiles() {
+  const apiKey = GDRIVE_DEFAULT_APIKEY;
+  const folderUrl = document.getElementById('driveFolderInput').value.trim();
+  const remember = document.getElementById('driveRememberChk').checked;
+  const listBtn = document.getElementById('driveListBtn');
+  const listEl = document.getElementById('driveFileList');
+  listEl.innerHTML = '';
+
+  if (!apiKey) { setDriveStatus('Chưa cấu hình API Key trong code (GDRIVE_DEFAULT_APIKEY).', true); return; }
+  const folderId = extractDriveFolderId(folderUrl);
+  if (!folderId) { setDriveStatus('Link thư mục Google Drive không hợp lệ.', true); return; }
+
+  if (remember) {
+    localStorage.setItem(GDRIVE_FOLDER_STORAGE, folderUrl);
+  }
+
+  listBtn.disabled = true;
+  setDriveStatus('Đang tải danh sách file từ Google Drive...');
+
+  try {
+    let files = [];
+    let pageToken = '';
+    do {
+      const params = new URLSearchParams({
+        q: `'${folderId}' in parents and trashed = false`,
+        key: apiKey,
+        fields: 'nextPageToken, files(id, name, mimeType, modifiedTime)',
+        pageSize: '100',
+        supportsAllDrives: 'true',
+        includeItemsFromAllDrives: 'true'
+      });
+      if (pageToken) params.set('pageToken', pageToken);
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = (data && data.error && data.error.message) ? data.error.message : `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      files = files.concat(data.files || []);
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+
+    const geojsonFiles = files.filter(f => f.name.toLowerCase().endsWith('.geojson'));
+
+    if (geojsonFiles.length === 0) {
+      setDriveStatus('Không tìm thấy file .geojson nào trong thư mục này.', true);
       return;
     }
 
-    allParcels = result.parcels;
-    // Link HSQ Tổng của xã đọc được từ chính file vừa mở (nếu QGIS script TDMAP đã gắn sẵn) —
-    // reset về '' mỗi lần mở file mới để không giữ lại link của file trước đó.
-    currentFileHsqXaLink = result.hsqXaLink || '';
-    await renderParcels(allParcels);
-    renderRanhThon(result.ranhThon);
-    document.getElementById('splash').style.display = 'none';
-    const soThonLines = (result.ranhThon && result.ranhThon.lines) ? result.ranhThon.lines.length : 0;
-    const thonNote = soThonLines > 0 ? ` (kèm ranh thôn)` : '';
-    showStatus(`✓ ${allParcels.length} thửa${thonNote} – ${file.name}`);
-  };
-  r.readAsText(file, 'UTF-8');
+    setDriveStatus(`✓ Tìm thấy ${geojsonFiles.length} file .geojson. Nhấn để mở:`);
+    geojsonFiles
+      .sort((a, b) => (b.modifiedTime || '').localeCompare(a.modifiedTime || ''))
+      .forEach(f => {
+        const item = document.createElement('div');
+        item.className = 'drive-file-item';
+        item.innerHTML = `<span class="dfi-icon">🗺️</span><span class="dfi-name"></span><span class="dfi-go">Mở ▸</span>`;
+        item.querySelector('.dfi-name').textContent = f.name;
+        item.onclick = () => openDriveFile(f.id, f.name, apiKey);
+        listEl.appendChild(item);
+      });
+  } catch (err) {
+    setDriveStatus(`Lỗi khi kết nối Google Drive: ${err.message || err}`, true);
+  } finally {
+    listBtn.disabled = false;
+  }
+}
+
+async function openDriveFile(fileId, fileName, apiKey) {
+  setDriveStatus(`Đang tải "${fileName}"...`);
+  try {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${encodeURIComponent(apiKey)}`);
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const j = await res.json(); if (j && j.error && j.error.message) msg = j.error.message; } catch (e) {}
+      throw new Error(msg);
+    }
+    const text = await res.text();
+    const ok = await processMapText(text, fileName);
+    if (ok) closeDriveModal();
+  } catch (err) {
+    setDriveStatus(`Không tải được file "${fileName}": ${err.message || err}`, true);
+  }
 }
 
 // ── STATUS ────────────────────────────────────────────────────────────────────
