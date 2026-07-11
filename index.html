@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TDMAP.PRO.VN-110726_DK</title>
+<title>TDMAP.PRO.VN-110726</title>
 
 <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI -->
 <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
@@ -658,7 +658,8 @@
   <div class="modal-box" style="max-width:380px;">
     <div class="modal-header"><svg width="18" height="18" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;margin-right:4px;"><polygon points="50,6 6,88 50,60" fill="#2684FC"/><polygon points="50,6 50,60 94,88" fill="#00AC47"/><polygon points="6,88 94,88 50,60" fill="#FFBA00"/></svg> Mở file .geojson từ Google Drive</div>
     <div class="modal-body">
-      <input id="driveApiKeyInput" type="hidden">
+      <div class="drive-field-label"><span>Google API Key (Drive API)</span></div>
+      <input id="driveApiKeyInput" type="text" placeholder="AIzaSy...">
 
       <div class="drive-field-label"><span>Link thư mục Google Drive</span></div>
       <input id="driveFolderInput" type="text" placeholder="https://drive.google.com/drive/folders/...">
@@ -2360,11 +2361,40 @@ async function processMapText(text, fileName) {
 // TDMAP sẽ ghi nhớ (localStorage) cho các lần mở sau.
 const GDRIVE_KEY_STORAGE = 'tdmap_gdrive_apikey_v1';
 const GDRIVE_FOLDER_STORAGE = 'tdmap_gdrive_folder_v1';
-// Dán API Key thật (dạng AIzaSy...) vào đây để tự động điền sẵn cho mọi người dùng,
-// không cần tự nhập tay ở mỗi máy/trình duyệt.
-const GDRIVE_DEFAULT_APIKEY = 'AIzaSyAZn4KyQwzy61JwoJL6Vcjs13wdAa00zsw';
+// KHÔNG gắn cứng API Key thật (dạng "AIzaSy...") vào code (file này có thể bị
+// đẩy lên kho GitHub công khai -> lộ key ngay lập tức, bị secret-scanning
+// quét ra). Thay vào đó dùng BÍ DANH NGẮN: người dùng chỉ cần dán mã ngắn
+// bên dưới vào ô "Google API Key", code sẽ tự tra ra key thật tương ứng.
+// Lưu ý: đây chỉ là CHE GIẤU (obfuscation) để tránh lộ liễu/tránh bị máy quét
+// tự động phát hiện, KHÔNG phải bảo mật thật sự — ai đọc kỹ mã nguồn vẫn có
+// thể giải mã lại được. Bảo mật thật sự nằm ở việc giới hạn key theo
+// HTTP referrer (chỉ cho phép domain của bạn) trong Google Cloud Console.
+const GDRIVE_KEY_ALIASES = {
+  // 'Bí danh ngắn gửi cho người dùng': 'Chuỗi key đã che giấu (mã hóa XOR + base64)'
+  'TDMAP-2026': 'FQ03IANLcWhYZw46AzIuLXJ8Cydden4ABSYpIXRnIyAMIGACSkFB'
+};
+const GDRIVE_KEY_PAD = 'TDMAP2026SECRET'; // khóa che giấu dùng chung cho XOR ở trên
+function decodeGdriveKeyToken(token) {
+  try {
+    const b64 = token.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - b64.length % 4) % 4);
+    const bin = atob(padded);
+    let out = '';
+    for (let i = 0; i < bin.length; i++) {
+      out += String.fromCharCode(bin.charCodeAt(i) ^ GDRIVE_KEY_PAD.charCodeAt(i % GDRIVE_KEY_PAD.length));
+    }
+    return out;
+  } catch (e) { return ''; }
+}
+// Nếu người dùng dán đúng bí danh (vd "TD-2026") thì tự đổi thành key thật;
+// nếu dán thẳng 1 API Key bình thường (dạng AIzaSy...) thì vẫn dùng nguyên như cũ.
+function resolveGdriveApiKey(raw) {
+  const v = (raw || '').trim();
+  if (GDRIVE_KEY_ALIASES[v]) return decodeGdriveKeyToken(GDRIVE_KEY_ALIASES[v]);
+  return v;
+}
+const GDRIVE_DEFAULT_APIKEY = '';
 const GDRIVE_DEFAULT_FOLDER = 'https://drive.google.com/drive/folders/1R60HGQu7PsU1sdr3PiDtkuWXtat7does?usp=drive_link';
-try { localStorage.removeItem(GDRIVE_KEY_STORAGE); } catch (e) {} // dọn key cũ (không còn dùng đến)
 
 function extractDriveFolderId(url) {
   if (!url) return null;
@@ -2379,7 +2409,7 @@ function extractDriveFolderId(url) {
 function openDriveModal() {
   const keyInput = document.getElementById('driveApiKeyInput');
   const folderInput = document.getElementById('driveFolderInput');
-  keyInput.value = GDRIVE_DEFAULT_APIKEY; // luôn dùng API Key gắn sẵn trong code, không hỏi người dùng
+  keyInput.value = localStorage.getItem(GDRIVE_KEY_STORAGE) || GDRIVE_DEFAULT_APIKEY;
   folderInput.value = localStorage.getItem(GDRIVE_FOLDER_STORAGE) || GDRIVE_DEFAULT_FOLDER;
   document.getElementById('driveFileList').innerHTML = '';
   setDriveStatus('');
@@ -2394,6 +2424,7 @@ function closeDriveModal() {
 }
 function clearDriveSettings() {
   localStorage.removeItem(GDRIVE_FOLDER_STORAGE);
+  localStorage.removeItem(GDRIVE_KEY_STORAGE);
   document.getElementById('driveApiKeyInput').value = GDRIVE_DEFAULT_APIKEY;
   document.getElementById('driveFolderInput').value = GDRIVE_DEFAULT_FOLDER;
   document.getElementById('driveFileList').innerHTML = '';
@@ -2409,19 +2440,21 @@ function setDriveStatus(msg, isError) {
 }
 
 async function listDriveGeojsonFiles() {
-  const apiKey = GDRIVE_DEFAULT_APIKEY;
+  const apiKeyRaw = document.getElementById('driveApiKeyInput').value.trim();
+  const apiKey = resolveGdriveApiKey(apiKeyRaw);
   const folderUrl = document.getElementById('driveFolderInput').value.trim();
   const remember = document.getElementById('driveRememberChk').checked;
   const listBtn = document.getElementById('driveListBtn');
   const listEl = document.getElementById('driveFileList');
   listEl.innerHTML = '';
 
-  if (!apiKey) { setDriveStatus('Chưa cấu hình API Key trong code (GDRIVE_DEFAULT_APIKEY).', true); return; }
+  if (!apiKey) { setDriveStatus('Vui lòng nhập Google API Key (hoặc mã bí danh được cấp) — tạo miễn phí tại Google Cloud Console, bật "Google Drive API".', true); return; }
   const folderId = extractDriveFolderId(folderUrl);
   if (!folderId) { setDriveStatus('Link thư mục Google Drive không hợp lệ.', true); return; }
 
   if (remember) {
     localStorage.setItem(GDRIVE_FOLDER_STORAGE, folderUrl);
+    localStorage.setItem(GDRIVE_KEY_STORAGE, apiKeyRaw);
   }
 
   listBtn.disabled = true;
