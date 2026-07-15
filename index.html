@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TDMAP.PRO.VN-150726_v1</title>
+  <title>TDMAP.PRO.VN-150726</title>
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
@@ -1424,7 +1424,7 @@
           </div>
           <div style="flex:1.2;">
             <div class="drive-field-label"><span>Google API Key</span></div>
-            <input class="drive-input" id="driveApiKeyInput" type="text" placeholder="Tdmap..."
+            <input class="drive-input" id="driveApiKeyInput" type="text" placeholder="Tdmap + mã xã (VD: Tdmap24301)"
               oninput="onApiKeyInput()">
           </div>
         </div>
@@ -3219,7 +3219,7 @@
         return out;
       } catch (e) { return ''; }
     }
-    // Nếu người dùng dán đúng bí danh (vd "TD-2026") thì tự đổi thành key thật;
+    // Nếu người dùng dán đúng bí danh dạng Tdmap+MãXã (vd "Tdmap24301") thì tự đổi thành key thật;
     // nếu dán thẳng 1 API Key bình thường (dạng AIzaSy...) thì vẫn dùng nguyên như cũ.
     function resolveGdriveApiKey(raw) {
       const v = (raw || '').trim();
@@ -3228,6 +3228,13 @@
       }
       if (GDRIVE_KEY_ALIASES[v]) return decodeGdriveKeyToken(GDRIVE_KEY_ALIASES[v]);
       return v;
+    }
+    // Kiểm tra key có đúng format Tdmap + mã xã hiện tại không
+    function validateTdmapKey(raw, commCode) {
+      if (!raw || !commCode) return false;
+      const v = raw.trim();
+      const expected = 'Tdmap' + commCode;
+      return v === expected;
     }
     const GDRIVE_DEFAULT_APIKEY = 'Tdmap';
     const GDRIVE_DEFAULT_FOLDER = '';
@@ -3309,8 +3316,6 @@
       const commName = document.getElementById('driveCommuneInput').value;
       const commCode = communesMap.get(commName);
       const codeInput = document.getElementById('driveCommuneCodeInput');
-      const apiInput = document.getElementById('driveApiKeyInput');
-      const folderInput = document.getElementById('driveFolderInput');
 
       if (!commCode) {
         codeInput.value = '';
@@ -3318,35 +3323,54 @@
       }
 
       codeInput.value = commCode;
-
-      const provName = document.getElementById('driveProvinceInput').value.trim();
-      const apiKeyRaw = apiInput.value.trim();
-      const apiKey = resolveGdriveApiKey(apiKeyRaw);
-
-      if (apiKey) {
-        fetchCommuneFolderLink(apiKey, provName, commName, commCode);
-      } else {
-        setDriveStatus('Vui lòng nhập Google API Key để tự động tìm link thư mục.', true);
-      }
     }
 
-    // Khi người dùng nhập/thay đổi API Key mà đã có mã xã → tự tìm thư mục Drive
+    // Khi người dùng nhập xong key dạng Tdmap+mã xã (VD: Tdmap24301) → tự tra mã xã
+    // trong dữ liệu ĐVHC, điền tỉnh/xã, rồi quét link thư mục và quét file bản đồ.
     let apiKeyDebounceTimer = null;
     function onApiKeyInput() {
       clearTimeout(apiKeyDebounceTimer);
-      apiKeyDebounceTimer = setTimeout(() => {
+      apiKeyDebounceTimer = setTimeout(async () => {
         const apiKeyRaw = document.getElementById('driveApiKeyInput').value.trim();
+        if (!apiKeyRaw) return;
+
+        // Kiểm tra key phải bắt đầu bằng Tdmap + ít nhất 1 ký tự mã xã
+        const m = apiKeyRaw.match(/^Tdmap(\d+)$/);
+        if (!m) {
+          // Chưa đúng format → chưa làm gì, chờ người dùng nhập tiếp
+          return;
+        }
+
+        const inputCommCode = m[1]; // mã xã người dùng nhập
+
+        // Tra mã xã trong dữ liệu ĐVHC
+        await loadDvhcData();
+        const dvhcItem = dvhcData.find(item => item["Mã"] === inputCommCode);
+        if (!dvhcItem) {
+          setDriveStatus(`Không tìm thấy mã xã "${inputCommCode}" trong dữ liệu ĐVHC. Vui lòng kiểm tra lại.`, true);
+          return;
+        }
+
+        const commCode = dvhcItem["Mã"];
+        const commName = dvhcItem["Tên"];
+        const provName = dvhcItem["Tỉnh / Thành Phố"];
+
+        // Tự động điền Tỉnh, Xã, Mã xã vào các ô
+        document.getElementById('driveProvinceInput').value = provName;
+        onProvinceInput(); // cập nhật danh sách xã của tỉnh
+        document.getElementById('driveCommuneInput').value = commName;
+        document.getElementById('driveCommuneCodeInput').value = commCode;
+
         const apiKey = resolveGdriveApiKey(apiKeyRaw);
-        const commCode = document.getElementById('driveCommuneCodeInput').value.trim();
-        if (!apiKey || !commCode) return; // chưa đủ điều kiện
+        if (!apiKey) {
+          setDriveStatus('Không thể giải mã API Key.', true);
+          return;
+        }
 
-        const provName = document.getElementById('driveProvinceInput').value.trim();
-        const commName = document.getElementById('driveCommuneInput').value.trim();
-        if (!provName || !commName) return;
-
-        // Tự động tìm link thư mục và điền vào ô
+        // Tự động quét tìm link thư mục và quét file bản đồ
+        setDriveStatus(`✓ Key hợp lệ: ${apiKeyRaw} — Đang quét link thư mục và file bản đồ...`);
         fetchCommuneFolderLink(apiKey, provName, commName, commCode);
-      }, 500); // debounce 500ms để chờ người dùng gõ xong
+      }, 800); // debounce 800ms để chờ người dùng gõ xong mã xã
     }
 
     async function fetchCommuneFolderLink(apiKey, provinceName, communeName, commCode) {
@@ -3424,7 +3448,7 @@
         }
       });
 
-      // Không tự liệt kê file ngay lúc mở để người dùng phải chọn/kiểm tra lại
+      // Nếu đã có đủ thông tin (tỉnh + xã + key đúng format) → tự động quét luôn
     }
 
     function closeDriveModal() {
