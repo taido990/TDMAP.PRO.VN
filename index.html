@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TDMAP.PRO.VN-150726_DDK</title>
+  <title>TDMAP.PRO.VN-150726_v1</title>
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
@@ -1424,7 +1424,8 @@
           </div>
           <div style="flex:1.2;">
             <div class="drive-field-label"><span>Google API Key</span></div>
-            <input class="drive-input" id="driveApiKeyInput" type="text" placeholder="Tdmap...">
+            <input class="drive-input" id="driveApiKeyInput" type="text" placeholder="Tdmap..."
+              oninput="onApiKeyInput()">
           </div>
         </div>
 
@@ -3327,6 +3328,25 @@
       } else {
         setDriveStatus('Vui lòng nhập Google API Key để tự động tìm link thư mục.', true);
       }
+    }
+
+    // Khi người dùng nhập/thay đổi API Key mà đã có mã xã → tự tìm thư mục Drive
+    let apiKeyDebounceTimer = null;
+    function onApiKeyInput() {
+      clearTimeout(apiKeyDebounceTimer);
+      apiKeyDebounceTimer = setTimeout(() => {
+        const apiKeyRaw = document.getElementById('driveApiKeyInput').value.trim();
+        const apiKey = resolveGdriveApiKey(apiKeyRaw);
+        const commCode = document.getElementById('driveCommuneCodeInput').value.trim();
+        if (!apiKey || !commCode) return; // chưa đủ điều kiện
+
+        const provName = document.getElementById('driveProvinceInput').value.trim();
+        const commName = document.getElementById('driveCommuneInput').value.trim();
+        if (!provName || !commName) return;
+
+        // Tự động tìm link thư mục và điền vào ô
+        fetchCommuneFolderLink(apiKey, provName, commName, commCode);
+      }, 500); // debounce 500ms để chờ người dùng gõ xong
     }
 
     async function fetchCommuneFolderLink(apiKey, provinceName, communeName, commCode) {
