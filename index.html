@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TDMAP.PRO.VN-150726</title>
+  <title>TDMAP.PRO.VN-160726</title>
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
@@ -1201,6 +1201,83 @@
     .route-line {
       filter: drop-shadow(0 0 4px rgba(26, 111, 212, .5));
     }
+
+    /* HƯỚNG DẪN 2 CỘT */
+    .hsq-guide-cols {
+      display: flex;
+      gap: 10px;
+    }
+
+    .hsq-guide-col {
+      flex: 1;
+      min-width: 0;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .hsq-guide-col.col-chua {
+      background: #fff8e1;
+      border: 1.5px solid #ffc107;
+    }
+
+    .hsq-guide-col.col-da {
+      background: #e8f5e9;
+      border: 1.5px solid #43a047;
+    }
+
+    .hsq-guide-col-title {
+      font-size: 11.5px;
+      font-weight: 800;
+      text-align: center;
+      padding: 3px 0 7px;
+      letter-spacing: 0.3px;
+    }
+
+    .col-chua .hsq-guide-col-title { color: #e65100; }
+    .col-da .hsq-guide-col-title { color: #2e7d32; }
+
+    .hsq-guide-cols .hsq-guide-item {
+      display: flex;
+      gap: 5px;
+      align-items: flex-start;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      font-size: 12px;
+    }
+
+    .hsq-guide-cols .hsq-guide-item:last-child {
+      border-bottom: none;
+    }
+
+    .hsq-guide-cols .hsq-guide-item b {
+      color: #00c6a7;
+      flex-shrink: 0;
+      font-size: 11px;
+    }
+
+    .hsq-guide-cols .hsq-guide-item code {
+      background: #f2f7f6;
+      color: #cc4400;
+      padding: 1px 5px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      display: inline-block;
+    }
+
+    .hsq-guide-cols .hsq-guide-example {
+      display: block;
+      color: #0d47a1;
+      font-weight: 700;
+      margin-top: 3px;
+      font-size: 11px;
+    }
+
+    /* Mở rộng modal khi hiển thị hướng dẫn 2 cột */
+    #hsqGuideOverlay .modal-box {
+      max-width: 520px;
+    }
   </style>
 </head>
 
@@ -1381,7 +1458,7 @@
   <!-- MODAL: HƯỚNG DẪN ĐẶT TÊN FILE KHI SCAN HSQ -->
   <div id="hsqGuideOverlay" class="modal-overlay">
     <div class="modal-box">
-      <div class="modal-header">📋 Hướng dẫn đặt tên file khi scan</div>
+      <div class="modal-header" id="hsqGuideHeader">📋 Hướng dẫn đặt tên file khi scan</div>
       <div class="modal-body" id="hsqGuideBody"></div>
       <div class="modal-footer">
         <button id="hsqGuideChangeBtn" class="modal-btn ghost" style="display:none;" onclick="changeHsqXaLink()">✎ Đổi
@@ -1655,34 +1732,54 @@
     // ── HƯỚNG DẪN ĐẶT TÊN FILE KHI SCAN HSQ ───────────────────────────────────────
     // Hướng dẫn khi mở HSQ của TỪNG THỬA (nút "Hồ sơ HSQ" trong popup thửa) — mẫu đơn giản.
     function buildHsqGuideHtmlThua(parcelId) {
-      const example = parcelId ? `${parcelId}-don.pdf` : '10-150-don.pdf';
+      const exampleDon = parcelId ? `${parcelId}-don.pdf` : '81-370-don.pdf';
+      const exampleGt  = parcelId ? `${parcelId}-gt.pdf`  : '81-370-gt.pdf';
       return `
-    <div class="hsq-guide-item"><b>1.</b><div>Scan CCCD chủ 1 → lưu: <code>c1.pdf</code></div></div>
-    <div class="hsq-guide-item"><b>2.</b><div>Scan CCCD chủ 2 → lưu: <code>c2.pdf</code></div></div>
-    <div class="hsq-guide-item"><b>3.</b><div>Scan Đơn đăng ký cấp giấy → lưu: <code>Tờ-thửa-don.pdf</code>
-      <span class="hsq-guide-example">Ví dụ: ${example}</span></div></div>
-    <div class="hsq-guide-item"><b>4.</b><div>Scan Giấy chứng nhận → lưu: <code>Số phát hành.pdf</code>
-      <span class="hsq-guide-example">Ví dụ: AB 123456.pdf</span></div></div>
+    <div class="hsq-guide-cols">
+      <div class="hsq-guide-col col-chua">
+        <div class="hsq-guide-col-title">⬜ Chưa có giấy</div>
+        <div class="hsq-guide-item"><b>1.</b><div>Scan CCCD chủ 1 → lưu: <code>c1.pdf</code></div></div>
+        <div class="hsq-guide-item"><b>2.</b><div>Scan CCCD chủ 2 → lưu: <code>c2.pdf</code></div></div>
+        <div class="hsq-guide-item"><b>3.</b><div>Scan Đơn đăng ký → lưu: <code>Tờ-thửa-don.pdf</code><span class="hsq-guide-example">Ví dụ: ${exampleDon}</span></div></div>
+        <div class="hsq-guide-item"><b>4.</b><div>Giấy tờ khác (nếu có) → lưu: <code>Tờ-thửa-gt.pdf</code><span class="hsq-guide-example">Ví dụ: ${exampleGt}</span></div></div>
+      </div>
+      <div class="hsq-guide-col col-da">
+        <div class="hsq-guide-col-title">✅ Đã có giấy</div>
+        <div class="hsq-guide-item"><b>1.</b><div>Scan CCCD chủ 1 → lưu: <code>c1.pdf</code></div></div>
+        <div class="hsq-guide-item"><b>2.</b><div>Scan CCCD chủ 2 → lưu: <code>c2.pdf</code></div></div>
+        <div class="hsq-guide-item"><b>3.</b><div>Scan Giấy chứng nhận → lưu: <code>Số phát hành.pdf</code><span class="hsq-guide-example">Ví dụ: AB 123456.pdf</span></div></div>
+      </div>
+    </div>
   `;
     }
     // Hướng dẫn khi mở HSQ Tổng CHUNG CỦA XÃ (nút "HSQ Ngoài Danh Sách") — mẫu kèm Số phát hành
     // để phân biệt nhiều chủ/nhiều bộ hồ sơ gộp chung trong 1 thư mục của xã.
     function buildHsqGuideHtmlXa() {
       return `
-    <div class="hsq-guide-item"><b>1.</b><div>Scan CCCD chủ 1 → lưu: <code>c1-Tờ-thửa.pdf</code> hoặc <code>c1-Số phát hành.pdf</code>
-      <span class="hsq-guide-example">Ví dụ: c1-10-150.pdf hoặc c1-AB 123456.pdf</span></div></div>
-    <div class="hsq-guide-item"><b>2.</b><div>Scan CCCD chủ 2 → lưu: <code>c2-Tờ-thửa.pdf</code> hoặc <code>c2-Số phát hành.pdf</code>
-      <span class="hsq-guide-example">Ví dụ: c2-10-150.pdf hoặc c2-AB 123456.pdf</span></div></div>
-    <div class="hsq-guide-item"><b>3.</b><div>Scan Đơn đăng ký cấp giấy → lưu: <code>Tờ-thửa-don.pdf</code>
-      <span class="hsq-guide-example">Ví dụ: 10-150-don.pdf</span></div></div>
-    <div class="hsq-guide-item"><b>4.</b><div>Scan Giấy chứng nhận → lưu: <code>Số phát hành.pdf</code>
-      <span class="hsq-guide-example">Ví dụ: AB 123456.pdf</span></div></div>
+    <div class="hsq-guide-cols">
+      <div class="hsq-guide-col col-chua">
+        <div class="hsq-guide-col-title">⬜ Chưa có giấy</div>
+        <div class="hsq-guide-item"><b>1.</b><div>Scan CCCD chủ 1 → lưu: <code>c1-Tờ-thửa.pdf</code><span class="hsq-guide-example">Ví dụ: c1-10-150.pdf</span></div></div>
+        <div class="hsq-guide-item"><b>2.</b><div>Scan CCCD chủ 2 → lưu: <code>c2-Tờ-thửa.pdf</code><span class="hsq-guide-example">Ví dụ: c2-10-150.pdf</span></div></div>
+        <div class="hsq-guide-item"><b>3.</b><div>Scan Đơn đăng ký → lưu: <code>Tờ-thửa-don.pdf</code><span class="hsq-guide-example">Ví dụ: 10-150-don.pdf</span></div></div>
+        <div class="hsq-guide-item"><b>4.</b><div>Giấy tờ khác (nếu có)<span class="hsq-guide-example">Ví dụ: 10-150-gt.pdf</span></div></div>
+      </div>
+      <div class="hsq-guide-col col-da">
+        <div class="hsq-guide-col-title">✅ Đã có giấy</div>
+        <div class="hsq-guide-item"><b>1.</b><div>Scan CCCD chủ 1 → lưu: <code>c1-Số phát hành.pdf</code><span class="hsq-guide-example">Ví dụ: c1-AB 123456.pdf</span></div></div>
+        <div class="hsq-guide-item"><b>2.</b><div>Scan CCCD chủ 2 → lưu: <code>c2-Số phát hành.pdf</code><span class="hsq-guide-example">Ví dụ: c2-AB 123456.pdf</span></div></div>
+        <div class="hsq-guide-item"><b>3.</b><div>Scan Giấy chứng nhận → lưu: <code>Số phát hành.pdf</code><span class="hsq-guide-example">Ví dụ: AB 123456.pdf</span></div></div>
+      </div>
+    </div>
   `;
     }
     function showHsqGuide(url, parcelId, allowChange) {
       pendingHsqUrl = url;
       // allowChange = true ⟶ đang mở từ nút HSQ chung của xã ⟶ dùng mẫu hướng dẫn của xã.
       // allowChange = false ⟶ đang mở HSQ của 1 thửa cụ thể ⟶ dùng mẫu hướng dẫn đơn giản.
+      document.getElementById('hsqGuideHeader').innerHTML = allowChange
+        ? '📋 Hướng dẫn đặt tên file — Ngoài danh sách'
+        : '📋 Hướng dẫn đặt tên file — Trong danh sách';
       document.getElementById('hsqGuideBody').innerHTML = allowChange
         ? buildHsqGuideHtmlXa()
         : buildHsqGuideHtmlThua(parcelId);
@@ -3295,6 +3392,13 @@
       dlComm.innerHTML = '';
       communesMap.clear();
 
+      // Xóa link thư mục và danh sách file khi đổi tỉnh/thành
+      document.getElementById('driveFolderInput').value = '';
+      document.getElementById('driveFileList').innerHTML = '';
+      const statusEl = document.getElementById('driveStatusMsg');
+      statusEl.textContent = '';
+      statusEl.style.display = 'none';
+
       if (!provCode) {
         commInput.disabled = true;
         return;
@@ -3323,6 +3427,13 @@
       }
 
       codeInput.value = commCode;
+
+      // Xóa link thư mục và danh sách file khi chọn xã mới
+      document.getElementById('driveFolderInput').value = '';
+      document.getElementById('driveFileList').innerHTML = '';
+      const statusEl = document.getElementById('driveStatusMsg');
+      statusEl.textContent = '';
+      statusEl.style.display = 'none';
     }
 
     // Khi người dùng nhập xong key dạng Tdmap+mã xã (VD: Tdmap24301) → tự tra mã xã
