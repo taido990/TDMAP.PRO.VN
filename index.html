@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TDMAP.PRO.VN-160726</title>
+  <title>TDMAP.PRO.VN-190726</title>
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
@@ -301,6 +301,47 @@
       pointer-events: none;
       transition: opacity .4s;
     }
+
+    /* Thanh tiến trình mở file — DÙNG CHUNG cho cả "Mở file từ máy" và "Google
+       Drive", để người dùng luôn biết đang ở bước nào (đọc/tải file → phân tích
+       dữ liệu → hiển thị lên bản đồ) thay vì chỉ thấy chữ mờ dần vô định. */
+    #fileProgressWrap {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 3000;
+      height: 3px;
+      background: transparent;
+      opacity: 0;
+      transition: opacity .3s;
+      pointer-events: none;
+    }
+    #fileProgressWrap.show { opacity: 1; }
+    #fileProgressBar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #00c6a7, #00e0bd);
+      box-shadow: 0 0 8px rgba(0, 198, 167, 0.7);
+      transition: width .25s ease;
+    }
+    #fileProgressBar.error { background: #e74c3c; box-shadow: 0 0 8px rgba(231,76,60,.7); }
+    #fileProgressLabel {
+      position: fixed;
+      top: 8px; left: 50%; transform: translateX(-50%);
+      z-index: 3000;
+      background: rgba(10, 18, 28, 0.92);
+      border: 1px solid rgba(0, 198, 167, 0.5);
+      border-radius: 14px;
+      padding: 5px 14px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #00c6a7;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .3s;
+    }
+    #fileProgressLabel.show { opacity: 1; }
+    #fileProgressLabel.error { color: #ff8a80; border-color: rgba(231,76,60,.6); }
 
     /* BADGE MỨC ZOOM */
     #zoomBadge {
@@ -1349,6 +1390,9 @@
     accept=".kml,.geojson,application/vnd.google-earth.kml+xml,application/geo+json,application/json"
     onchange="handleFile(this.files[0])">
 
+  <div id="fileProgressWrap"><div id="fileProgressBar"></div></div>
+  <div id="fileProgressLabel"></div>
+
   <div id="statusPill" style="opacity:0">–</div>
   <div id="zoomBadge"><span class="zb-dot"></span><span id="zoomBadgeText">Zoom 13</span></div>
   <div id="topControlsRow">
@@ -1528,7 +1572,32 @@
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="dvhc2025.js"></script>
+  <!-- TỐI ƯU: dvhc2025.js (danh mục 63 tỉnh + hàng nghìn xã) chỉ cần cho tính năng
+       Google Drive, KHÔNG cần để hiển thị bản đồ. Trước đây tải đồng bộ (blocking)
+       ngay đầu <head> khiến MỌI người dùng phải chờ file này tải+chạy xong mới
+       thấy được trang. Nay tải "defer" (không chặn parse HTML) + chỉ inject thẻ
+       script thật sự lúc người dùng mở modal Google Drive lần đầu (xem hàm
+       ensureDvhcScriptLoaded() bên dưới). -->
+  <script>
+    let __dvhcScriptState = 'idle'; // idle | loading | ready
+    function ensureDvhcScriptLoaded() {
+      return new Promise((resolve) => {
+        if (__dvhcScriptState === 'ready' || typeof dvhcDataList !== 'undefined') {
+          __dvhcScriptState = 'ready'; resolve(); return;
+        }
+        if (__dvhcScriptState === 'loading') {
+          document.addEventListener('dvhc-ready', () => resolve(), { once: true });
+          return;
+        }
+        __dvhcScriptState = 'loading';
+        const s = document.createElement('script');
+        s.src = 'dvhc2025.js';
+        s.onload = () => { __dvhcScriptState = 'ready'; document.dispatchEvent(new Event('dvhc-ready')); resolve(); };
+        s.onerror = () => { __dvhcScriptState = 'idle'; resolve(); };
+        document.head.appendChild(s);
+      });
+    }
+  </script>
   <script>
     // ── DIRECTIONS (CHỈ ĐƯỜNG TRỰC TIẾP TRONG WEB) ────────────────────────────────
     let routeLine = null;
@@ -1880,9 +1949,34 @@
     adjustTopLayout();
     setTimeout(adjustTopLayout, 300);
 
-    const map = L.map('map', { zoomControl: false, attributionControl: false });
-    L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-      { subdomains: '0123', maxZoom: 22 }).addTo(map);
+    const map = L.map('map', {
+      zoomControl: false, attributionControl: false,
+      // preferCanvas: dồn các layer vector mới tạo về renderer Canvas mặc định
+      // (đỡ tốn DOM node), đồng bộ với mapCanvasRenderer dùng riêng cho thửa/ranh.
+      preferCanvas: true
+    });
+    const tileLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      subdomains: '0123', maxZoom: 22,
+      // TỐI ƯU: khi người dùng kéo/lướt bản đồ nhanh (đặc biệt trên di động, mạng
+      // 3G/4G yếu), tile ở các vị trí trung gian sẽ liên tục được yêu cầu rồi huỷ
+      // ngay -> tốn băng thông + CPU giải nén ảnh vô ích, gây giật. keepBuffer cao
+      // hơn giữ lại tile lân cận đã tải để tái dùng khi quay lại; updateWhenZooming
+      // false tránh tải tile ở mức zoom trung gian trong lúc đang animate zoom.
+      keepBuffer: 3,
+      updateWhenZooming: false,
+      updateWhenIdle: false
+    }).addTo(map);
+    // Nếu tile lỗi (mạng chậm, hoặc nguồn tile không chính thức của Google bị giới
+    // hạn/chặn tạm thời do quá nhiều request đồng thời từ nhiều người dùng) -> báo
+    // trạng thái thay vì im lặng để trắng bản đồ, người dùng biết là do mạng/tile
+    // chứ không nghĩ web bị treo.
+    let tileErrorNotified = false;
+    tileLayer.on('tileerror', () => {
+      if (tileErrorNotified) return;
+      tileErrorNotified = true;
+      showStatus('Bản đồ nền tải chậm (mạng yếu hoặc nguồn ảnh vệ tinh đang quá tải) — vui lòng chờ hoặc thử lại.');
+      setTimeout(() => { tileErrorNotified = false; }, 8000);
+    });
 
     L.control.attribution({ position: 'bottomright', prefix: '' })
       .addAttribution('© Google · TDMAP.PRO.VN').addTo(map);
@@ -2293,6 +2387,43 @@
       });
     }
 
+    // ── GIỚI HẠN BỘ NHỚ ĐỆM LAYER (chống crash/"văng trang" trên máy yếu) ──────────
+    // Thiết kế cũ: mỗi thửa 1 khi đã tạo polygon+dot+tooltip thì GIỮ MÃI trong bộ
+    // nhớ (kể cả khi đã gỡ khỏi bản đồ) để "dùng lại cho nhanh". Với file 30.000-
+    // 50.000+ thửa, nếu người dùng pan/zoom qua nhiều khu vực trong 1 phiên, số
+    // lượng object Leaflet cache tăng dần KHÔNG GIỚI HẠN -> ngốn RAM liên tục ->
+    // trên điện thoại tầm trung/thấp trình duyệt sẽ tự kill tab (out trang).
+    // Giải pháp: giới hạn số thửa "vật chất hoá" (đã tạo poly/dot/tooltip) tối đa
+    // cùng lúc; khi vượt ngưỡng, huỷ hẳn (giải phóng bộ nhớ) những thửa lâu chưa
+    // dùng nhất và hiện KHÔNG có trên bản đồ (LRU - Least Recently Used).
+    const MAX_CACHED_LAYERS = 6000;
+    const PRUNE_HYSTERESIS = 1200; // chỉ prune khi vượt ngưỡng + đệm này, tránh prune liên tục
+    let materializedCount = 0;
+    let lruCounter = 0;
+
+    function destroyParcelLayers(p) {
+      if (p._poly) { p._poly.off(); p._poly = null; }
+      if (p._dot) { p._dot.off(); p._dot = null; }
+      p._lbl = null; p._lblBound = false; p._dotAdded = false; p._onMap = false;
+      materializedCount--;
+    }
+
+    function pruneLayerCache() {
+      if (materializedCount <= MAX_CACHED_LAYERS + PRUNE_HYSTERESIS) return;
+      // Chỉ xét các thửa ĐÃ có layer nhưng KHÔNG còn trên bản đồ hiện tại.
+      const offMapCached = [];
+      for (let i = 0; i < allParcels.length; i++) {
+        const p = allParcels[i];
+        if (p._poly && !p._onMap) offMapCached.push(p);
+      }
+      offMapCached.sort((a, b) => (a._lru || 0) - (b._lru || 0));
+      let toRemove = materializedCount - MAX_CACHED_LAYERS;
+      for (let i = 0; i < offMapCached.length && toRemove > 0; i++) {
+        destroyParcelLayers(offMapCached[i]);
+        toRemove--;
+      }
+    }
+
     // ── LƯỚI CHỈ MỤC KHÔNG GIAN (spatial grid) + VIEWPORT CULLING ──────────────────
     // Với file rất lớn (30.000-50.000+ thửa), giữ TẤT CẢ polygon trên Canvas cùng
     // lúc khiến trình duyệt phải vẽ lại toàn bộ ở mỗi khung hình khi pan/zoom ->
@@ -2396,6 +2527,7 @@
       p._dotAdded = false;
       p._poly = poly;
       p._dot = dot;
+      materializedCount++;
     }
 
     // Đảm bảo 1 thửa có mặt trên bản đồ (tạo layer nếu chưa có, thêm lại nếu đã
@@ -2404,6 +2536,7 @@
     function ensureParcelOnMap(p) {
       if (!p.rings || !p.rings.length) return false;
       if (!p._poly) createParcelLayers(p);
+      p._lru = ++lruCounter; // đánh dấu "vừa dùng" để LRU không huỷ nhầm thửa đang cần
       if (!p._onMap) {
         p._poly.addTo(map);
         p._onMap = true;
@@ -2489,7 +2622,7 @@
     const VIEW_REMOVE_PAD = 1.4;
     let viewSyncTimer = null;
 
-    function syncViewportLayers(showProgress) {
+    function syncViewportLayers(onProgress) {
       return new Promise(resolveSync => {
         if (!allParcels.length) { resolveSync(); return; }
         const b = map.getBounds();
@@ -2521,12 +2654,14 @@
           if (!p._onMap && boxIntersects(p, addMinLat, addMaxLat, addMinLon, addMaxLon)) toAdd.push(p);
         });
 
-        if (toAdd.length === 0) { updateAllLabels(); resolveSync(); return; }
+        if (toAdd.length === 0) { updateAllLabels(); pruneLayerCache(); if (onProgress) onProgress(1); resolveSync(); return; }
 
         // Danh sách nhỏ (đa số các lần pan/zoom bình thường) -> thêm ngay, không cần chia lô
         if (toAdd.length <= 400) {
           for (let k = 0; k < toAdd.length; k++) ensureParcelOnMap(toAdd[k]);
           updateAllLabels();
+          pruneLayerCache();
+          if (onProgress) onProgress(1);
           resolveSync();
           return;
         }
@@ -2537,11 +2672,12 @@
         function step() {
           const end = Math.min(k + RENDER_CHUNK_SIZE, toAdd.length);
           for (; k < end; k++) ensureParcelOnMap(toAdd[k]);
-          if (showProgress) showStatus(`Đang tải ${k}/${toAdd.length} thửa...`);
+          if (onProgress) onProgress(k / toAdd.length);
           if (k < toAdd.length) {
             scheduleChunk(step);
           } else {
             updateAllLabels();
+            pruneLayerCache();
             resolveSync();
           }
         }
@@ -2551,7 +2687,7 @@
 
     function scheduleViewportSync() {
       clearTimeout(viewSyncTimer);
-      viewSyncTimer = setTimeout(() => syncViewportLayers(false), 120);
+      viewSyncTimer = setTimeout(() => syncViewportLayers(null), 120);
     }
 
     // Báo mức zoom hiện tại lên badge góc trên-trái (luôn hiển thị cố định,
@@ -2580,10 +2716,15 @@
     map.on('zoomend moveend', () => { scheduleViewportSync(); updateZoomBadge(); });
     updateZoomBadge();
 
-    function renderParcels(list) {
+    function renderParcels(list, onRenderProgress) {
       // Gỡ toàn bộ layer đang hiển thị của lần tải trước (nếu có)
       renderedSet.forEach(p => removeParcelFromMap(p));
       renderedSet.clear();
+      // Reset bộ đếm cache: mảng allParcels cũ (cùng mọi layer Leaflet nó giữ) sẽ
+      // bị thay thế hoàn toàn ngay bên dưới -> không còn tham chiếu nào trỏ tới ->
+      // trình duyệt tự thu hồi bộ nhớ (garbage collected). Nếu không reset, bộ đếm
+      // sẽ cộng dồn sai qua nhiều lần mở file trong cùng 1 phiên làm việc.
+      materializedCount = 0;
 
       // Tính bounds tổng thể trực tiếp từ tọa độ (KHÔNG cần tạo polygon trước) ->
       // rất nhanh dù có 30.000-50.000+ thửa, vì chỉ là vòng lặp cộng dồn số học.
@@ -2606,7 +2747,7 @@
       // Chỉ vẽ các thửa trong khung nhìn (+ vùng đệm) hiện tại, theo từng lô nhỏ
       // để không treo giao diện. Các thửa còn lại sẽ tự động được vẽ/gỡ khi
       // người dùng pan/zoom (xem scheduleViewportSync ở trên).
-      return syncViewportLayers(true);
+      return syncViewportLayers(onRenderProgress || null);
     }
 
     // ── RANH THÔN (ranh giới thôn/tổ dân phố) ───────────────────────────────────────
@@ -3245,43 +3386,166 @@
         document.getElementById('fileInput').value = '';
         return;
       }
+      // Cảnh báo sớm với file rất lớn: phân tích (parse) vẫn chạy trong Web Worker
+      // nên KHÔNG làm treo giao diện, nhưng bản thân việc giữ hàng chục nghìn thửa
+      // + polygon trong bộ nhớ vẫn cần RAM đáng kể trên điện thoại cấu hình thấp.
+      // Cho người dùng biết trước để chủ động, thay vì máy tự lag/thoát ứng dụng
+      // giữa chừng mà không hiểu vì sao.
+      const FILE_WARN_SIZE = 20 * 1024 * 1024; // 20MB
+      if (file.size > FILE_WARN_SIZE) {
+        showStatus(`File khá lớn (${(file.size / 1024 / 1024).toFixed(1)}MB) — máy cấu hình thấp có thể chạy chậm hơn bình thường...`);
+      }
       const r = new FileReader();
+      FileProgress.start('Đang đọc file từ máy...');
+      r.onprogress = e => {
+        if (e.lengthComputable) FileProgress.set((e.loaded / e.total) * 15); // giai đoạn đọc file chiếm 0-15%
+      };
+      r.onerror = () => {
+        FileProgress.fail('Lỗi đọc file');
+        showAlert(`Không đọc được file "${file.name}" từ máy. File có thể bị hỏng hoặc quá lớn so với bộ nhớ trình duyệt.`);
+      };
       r.onload = async e => {
-        await processMapText(e.target.result, file.name);
+        FileProgress.set(15);
+        await processMapText(e.target.result, file.name, 15);
       };
       r.readAsText(file, 'UTF-8');
     }
 
     // ── XỬ LÝ DÙNG CHUNG: nhận nội dung text (KML/GeoJSON) + tên file, render lên bản đồ.
     // Dùng chung cho cả file mở từ máy (handleFile) và file tải về từ Google Drive.
-    async function processMapText(text, fileName) {
+    // progressStart: % đã hoàn thành ở giai đoạn TRƯỚC đó (đọc file / tải mạng),
+    // để thanh tiến trình nối tiếp liền mạch thay vì nhảy lại từ 0.
+    async function processMapText(text, fileName, progressStart = 0) {
       const isGeoJSON = detectIsGeoJSON(fileName, text);
+      const parseEnd = progressStart + (100 - progressStart) * 0.55; // mốc cuối giai đoạn "phân tích"
       showStatus(isGeoJSON ? 'Đang phân tích dữ liệu GeoJSON...' : 'Đang phân tích dữ liệu KML...');
+      FileProgress.creepTo(parseEnd, isGeoJSON ? 'Đang phân tích dữ liệu GeoJSON...' : 'Đang phân tích dữ liệu KML...');
 
       let result;
       try {
         result = isGeoJSON ? await parseGeoJSONAsync(text) : await parseKMLAsync(text);
       } catch (err) {
+        FileProgress.fail('Lỗi đọc file');
         showAlert(
           `Không thể đọc file này (${fileName}).\n` +
           `Vui lòng kiểm tra đây là file .kml hoặc .geojson hợp lệ do TDMAP xuất ra.\n\nChi tiết lỗi: ${err}`
         );
         return false;
       }
+      FileProgress.stopCreep();
+      FileProgress.set(parseEnd);
 
       allParcels = result.parcels;
       // Link HSQ Tổng của xã đọc được từ chính file vừa mở (nếu QGIS script TDMAP đã gắn sẵn) —
       // reset về '' mỗi lần mở file mới để không giữ lại link của file trước đó.
       currentFileHsqXaLink = result.hsqXaLink || '';
-      await renderParcels(allParcels);
+
+      FileProgress.setLabel(`Đang hiển thị ${allParcels.length} thửa lên bản đồ...`);
+      await renderParcels(allParcels, frac => FileProgress.set(parseEnd + frac * (100 - parseEnd)));
       renderRanhThon(result.ranhThon);
       updateMapStats();
       document.getElementById('splash').style.display = 'none';
       const soThonLines = (result.ranhThon && result.ranhThon.lines) ? result.ranhThon.lines.length : 0;
       const thonNote = soThonLines > 0 ? ` (kèm ranh thôn)` : '';
+      FileProgress.finish(`✓ Xong · ${allParcels.length} thửa`);
       showStatus(`✓ ${allParcels.length} thửa${thonNote} – ${fileName}`);
       return true;
     }
+
+    // ── LƯU BẢN ĐỒ NGAY TRÊN THIẾT BỊ (IndexedDB) ───────────────────────────────────
+    // Mục tiêu: lần mở sau KHÔNG cần tải lại từ Google Drive (nhanh hơn, đỡ tốn
+    // Drive API quota, dùng được cả khi mất mạng ngoài thực địa). Dùng IndexedDB
+    // thay vì localStorage vì localStorage chỉ ~5-10MB — quá nhỏ cho file
+    // geojson 30.000-50.000+ thửa (có thể vài chục MB); IndexedDB cho phép lưu
+    // hàng trăm MB tuỳ dung lượng trống của máy.
+    // Cơ chế "thay thế khi có bản mới": mỗi bản ghi cache gắn kèm modifiedTime lấy
+    // từ Google Drive. Khi mở lại 1 file, nếu modifiedTime trên Drive TRÙNG với
+    // bản đã lưu -> dùng luôn bản trên máy (không tải lại gì cả). Nếu KHÁC (chủ
+    // xã vừa cập nhật thửa mới) -> tải bản mới về rồi GHI ĐÈ (thay thế) bản cũ.
+    const LocalMapCache = (() => {
+      const DB_NAME = 'tdmap_local_cache_v1';
+      const STORE = 'geojson_files';
+      const MAX_ENTRIES = 6; // giới hạn số bản đồ giữ trên máy, tránh chiếm hết dung lượng
+      let dbPromise = null;
+
+      function openDB() {
+        if (dbPromise) return dbPromise;
+        dbPromise = new Promise((resolve, reject) => {
+          if (!window.indexedDB) { resolve(null); return; }
+          const req = indexedDB.open(DB_NAME, 1);
+          req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(STORE)) {
+              db.createObjectStore(STORE, { keyPath: 'fileId' });
+            }
+          };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => resolve(null); // lỗi IndexedDB (vd chế độ ẩn danh) -> coi như không có cache, không chặn app
+        });
+        return dbPromise;
+      }
+
+      async function get(fileId) {
+        const db = await openDB();
+        if (!db) return null;
+        return new Promise(resolve => {
+          try {
+            const tx = db.transaction(STORE, 'readonly');
+            const req = tx.objectStore(STORE).get(fileId);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+          } catch (e) { resolve(null); }
+        });
+      }
+
+      async function listAll() {
+        const db = await openDB();
+        if (!db) return [];
+        return new Promise(resolve => {
+          try {
+            const tx = db.transaction(STORE, 'readonly');
+            const req = tx.objectStore(STORE).getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => resolve([]);
+          } catch (e) { resolve([]); }
+        });
+      }
+
+      async function save(entry) {
+        const db = await openDB();
+        if (!db) return false;
+        entry.savedAt = Date.now();
+        return new Promise(resolve => {
+          try {
+            const tx = db.transaction(STORE, 'readwrite');
+            tx.objectStore(STORE).put(entry);
+            tx.oncomplete = async () => { await pruneOldest(); resolve(true); };
+            tx.onerror = () => resolve(false);
+          } catch (e) { resolve(false); }
+        });
+      }
+
+      async function remove(fileId) {
+        const db = await openDB();
+        if (!db) return;
+        try {
+          const tx = db.transaction(STORE, 'readwrite');
+          tx.objectStore(STORE).delete(fileId);
+        } catch (e) { }
+      }
+
+      // Giữ tối đa MAX_ENTRIES bản đồ gần dùng nhất trên máy; xã cũ lâu không mở
+      // tự động bị dọn để không chiếm dung lượng vô hạn.
+      async function pruneOldest() {
+        const all = await listAll();
+        if (all.length <= MAX_ENTRIES) return;
+        all.sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
+        const toRemove = all.slice(0, all.length - MAX_ENTRIES);
+        for (const e of toRemove) await remove(e.fileId);
+      }
+
+      return { get, listAll, save, remove };
+    })();
 
     // ── MỞ FILE .GEOJSON TỪ GOOGLE DRIVE ───────────────────────────────────────────
     // Ghi chú: Google Drive API v3 luôn cần một API Key hợp lệ để liệt kê/tải nội dung
@@ -3352,6 +3616,7 @@
 
     async function loadDvhcData() {
       if (dvhcData.length === 0) {
+        await ensureDvhcScriptLoaded();
         try {
           if (typeof dvhcDataList !== 'undefined') {
             dvhcData = dvhcDataList;
@@ -3546,6 +3811,10 @@
       setDriveStatus('');
       document.getElementById('driveModalOverlay').classList.add('show');
 
+      // Hiện ngay danh sách bản đồ đã lưu sẵn trên máy (không cần mạng/API key) —
+      // hữu ích khi đang ngoài thực địa mất sóng, hoặc chỉ muốn mở lại xã vừa xem.
+      renderOfflineCacheList();
+
       loadDvhcData().then(() => {
         const savedProv = localStorage.getItem('tdmap_prov_v1');
         const savedComm = localStorage.getItem('tdmap_comm_v1');
@@ -3560,6 +3829,47 @@
       });
 
       // Nếu đã có đủ thông tin (tỉnh + xã + key đúng format) → tự động quét luôn
+    }
+
+    async function renderOfflineCacheList() {
+      const listEl = document.getElementById('driveFileList');
+      if (!listEl) return;
+      const cached = await LocalMapCache.listAll();
+      if (!cached.length) return;
+      cached.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+
+      const header = document.createElement('div');
+      header.style.cssText = 'font-size:10.5px;font-weight:800;color:#00c6a7;letter-spacing:.5px;padding:6px 2px;';
+      header.textContent = `📦 ĐÃ LƯU TRÊN MÁY NÀY (mở không cần mạng)`;
+      listEl.appendChild(header);
+
+      cached.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'drive-file-item';
+        const savedDate = c.savedAt ? new Date(c.savedAt).toLocaleDateString('vi-VN') : '';
+        item.innerHTML = `<span class="dfi-icon">🗺️</span><span class="dfi-name"></span><span class="dfi-go">Mở ngay ▸</span>`;
+        item.querySelector('.dfi-name').textContent = `${c.fileName} · lưu ${savedDate}`;
+        item.onclick = async () => {
+          FileProgress.start('📦 Đang mở dữ liệu đã lưu trên máy...');
+          FileProgress.set(40);
+          setDriveStatus(`📦 Đang mở "${c.fileName}" từ dữ liệu đã lưu trên máy...`);
+          const ok = await processMapText(c.text, c.fileName, 40);
+          if (ok) { closeDriveModal(); showStatus(`✓ Mở "${c.fileName}" từ bộ nhớ máy (ngoại tuyến)`); }
+        };
+        item.oncontextmenu = null;
+        const delBtn = document.createElement('span');
+        delBtn.textContent = '✕';
+        delBtn.title = 'Xoá bản lưu này khỏi máy';
+        delBtn.style.cssText = 'margin-left:8px;color:#c33;cursor:pointer;font-weight:800;flex-shrink:0;';
+        delBtn.onclick = async (ev) => {
+          ev.stopPropagation();
+          await LocalMapCache.remove(c.fileId);
+          listEl.innerHTML = '';
+          renderOfflineCacheList();
+        };
+        item.appendChild(delBtn);
+        listEl.appendChild(item);
+      });
     }
 
     function closeDriveModal() {
@@ -3646,16 +3956,23 @@
         }
 
         setDriveStatus(`✓ Tìm thấy ${geojsonFiles.length} file .geojson. Nhấn để mở:`);
-        geojsonFiles
-          .sort((a, b) => (b.modifiedTime || '').localeCompare(a.modifiedTime || ''))
-          .forEach(f => {
-            const item = document.createElement('div');
-            item.className = 'drive-file-item';
-            item.innerHTML = `<span class="dfi-icon">🗺️</span><span class="dfi-name"></span><span class="dfi-go">Mở ▸</span>`;
-            item.querySelector('.dfi-name').textContent = f.name;
-            item.onclick = () => openDriveFile(f.id, f.name, apiKey, f.size);
-            listEl.appendChild(item);
-          });
+        const sorted = geojsonFiles.sort((a, b) => (b.modifiedTime || '').localeCompare(a.modifiedTime || ''));
+        for (const f of sorted) {
+          const cached = await LocalMapCache.get(f.id);
+          const isCachedSame = cached && cached.modifiedTime === f.modifiedTime;
+          const isCachedStale = cached && cached.modifiedTime !== f.modifiedTime;
+          const item = document.createElement('div');
+          item.className = 'drive-file-item';
+          const badge = isCachedSame
+            ? '<span class="dfi-go" style="color:#00c6a7;">📦 Đã lưu máy · Mở ngay ▸</span>'
+            : isCachedStale
+              ? '<span class="dfi-go" style="color:#cc8400;">🔄 Có bản mới ▸</span>'
+              : '<span class="dfi-go">Mở ▸</span>';
+          item.innerHTML = `<span class="dfi-icon">🗺️</span><span class="dfi-name"></span>${badge}`;
+          item.querySelector('.dfi-name').textContent = f.name;
+          item.onclick = () => openDriveFile(f.id, f.name, apiKey, f.size, f.modifiedTime);
+          listEl.appendChild(item);
+        }
       } catch (err) {
         setDriveStatus(`Lỗi khi kết nối Google Drive: ${err.message || err}`, true);
       } finally {
@@ -3663,7 +3980,23 @@
       }
     }
 
-    async function openDriveFile(fileId, fileName, apiKey, fileSize) {
+    async function openDriveFile(fileId, fileName, apiKey, fileSize, modifiedTime) {
+      // 1) Đã có bản TRÙNG phiên bản lưu sẵn trên máy -> mở ngay, KHÔNG cần tải
+      // mạng gì cả (nhanh gần như tức thì, kể cả không có mạng).
+      if (modifiedTime) {
+        const cached = await LocalMapCache.get(fileId);
+        if (cached && cached.modifiedTime === modifiedTime && cached.text) {
+          FileProgress.start('📦 Đang mở dữ liệu đã lưu trên máy...');
+          FileProgress.set(40);
+          setDriveStatus(`📦 Đang mở "${fileName}" từ dữ liệu đã lưu trên máy...`);
+          await new Promise(r => setTimeout(r, 30));
+          const ok = await processMapText(cached.text, fileName, 40);
+          if (ok) { closeDriveModal(); showStatus(`✓ Mở "${fileName}" từ bộ nhớ máy (ngoại tuyến)`); }
+          return;
+        }
+      }
+
+      FileProgress.start(`Đang chuẩn bị tải "${fileName}"...`);
       setDriveStatus(`Đang chuẩn bị tải "${fileName}"...`);
       try {
         const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${encodeURIComponent(apiKey)}`);
@@ -3696,27 +4029,124 @@
               <div style="width:${percent}%; background:#00c6a7; height:100%; transition:width 0.1s;"></div>
             </div>`;
               setDriveStatus(html, false, true);
+              FileProgress.set(percent * 0.5); // giai đoạn tải mạng chiếm 0-50% của tổng tiến trình
+              FileProgress.setLabel(`Đang tải "${fileName}"... ${percent}%`);
             } else {
               let mb = (loaded / (1024 * 1024)).toFixed(1);
               setDriveStatus(`Đang tải "${fileName}"... ${mb} MB`);
+              FileProgress.setLabel(`Đang tải "${fileName}"... ${mb} MB`);
             }
           }
           text += decoder.decode(); // flush remaining
         } else {
           setDriveStatus(`Đang tải "${fileName}"...`);
+          FileProgress.setLabel(`Đang tải "${fileName}"...`);
           text = await res.text();
         }
 
         setDriveStatus(`Đang phân tích dữ liệu bản đồ...`);
+        FileProgress.set(50);
         // Chờ 1 chút để UI kịp render trạng thái
         await new Promise(r => setTimeout(r, 50));
 
-        const ok = await processMapText(text, fileName);
-        if (ok) closeDriveModal();
+        const ok = await processMapText(text, fileName, 50);
+        if (ok) {
+          closeDriveModal();
+          // 2) LƯU (thay thế bản cũ nếu có) vào IndexedDB để lần sau mở tức thì.
+          // Chạy nền, không chặn giao diện; nếu máy hết dung lượng/lỗi thì bỏ qua
+          // âm thầm (app vẫn hoạt động bình thường, chỉ là không có cache).
+          LocalMapCache.save({ fileId, fileName, modifiedTime: modifiedTime || '', text });
+        }
       } catch (err) {
+        // Mạng lỗi nhưng lỡ đã từng có bản cũ trên máy (khác phiên bản) -> vẫn cho
+        // dùng tạm bản cũ thay vì bó tay hoàn toàn, kèm cảnh báo rõ ràng.
+        const staleCache = modifiedTime ? await LocalMapCache.get(fileId) : null;
+        if (staleCache && staleCache.text) {
+          setDriveStatus(`Không tải được bản mới (${err.message || err}). Đang mở tạm bản đã lưu trên máy (có thể cũ hơn)...`, true);
+          FileProgress.setLabel('Không tải được bản mới — mở tạm bản đã lưu...');
+          const ok = await processMapText(staleCache.text, fileName, 40);
+          if (ok) closeDriveModal();
+          return;
+        }
+        FileProgress.fail('Lỗi tải file');
         setDriveStatus(`Không tải được file "${fileName}": ${err.message || err}`, true);
       }
     }
+
+    // ── THANH TIẾN TRÌNH MỞ FILE (dùng chung: file trên máy + Google Drive) ────────
+    // 3 giai đoạn luôn hiển thị rõ ràng cho người dùng:
+    //   1) Đọc/tải file  2) Phân tích dữ liệu (KML/GeoJSON)  3) Hiển thị lên bản đồ
+    // Vì bước "phân tích" chạy trong Web Worker không báo được % thật, ta cho
+    // thanh tiến trình "bò" dần tới gần mốc cuối của giai đoạn đó trong lúc chờ,
+    // rồi nhảy hẳn tới mốc khi worker trả kết quả — người dùng luôn thấy có tiến
+    // triển thay vì màn hình đứng yên không rõ có đang chạy hay bị treo.
+    const FileProgress = (() => {
+      const wrap = document.getElementById('fileProgressWrap');
+      const bar = document.getElementById('fileProgressBar');
+      const label = document.getElementById('fileProgressLabel');
+      let hideTimer = null;
+      let creepTimer = null;
+
+      function start(initialLabel) {
+        clearTimeout(hideTimer);
+        clearInterval(creepTimer);
+        bar.classList.remove('error');
+        label.classList.remove('error');
+        bar.style.width = '0%';
+        wrap.classList.add('show');
+        setLabel(initialLabel || 'Đang bắt đầu...');
+      }
+
+      function setLabel(txt) {
+        label.textContent = txt;
+        label.classList.add('show');
+      }
+
+      function set(percent) {
+        bar.style.width = Math.max(0, Math.min(100, percent)) + '%';
+      }
+
+      // "Bò" dần từ mốc hiện tại tới gần targetPercent (không chạm hẳn) trong lúc
+      // chờ 1 việc không có tiến trình đo được (vd worker đang parse XML/JSON).
+      function creepTo(targetPercent, label2) {
+        clearInterval(creepTimer);
+        if (label2) setLabel(label2);
+        let cur = parseFloat(bar.style.width) || 0;
+        const ceiling = targetPercent - 2;
+        creepTimer = setInterval(() => {
+          if (cur >= ceiling) { clearInterval(creepTimer); return; }
+          cur += (ceiling - cur) * 0.12 + 0.3;
+          set(cur);
+        }, 120);
+      }
+
+      function stopCreep() { clearInterval(creepTimer); }
+
+      function finish(finalLabel) {
+        stopCreep();
+        set(100);
+        if (finalLabel) setLabel(finalLabel);
+        hideTimer = setTimeout(() => {
+          wrap.classList.remove('show');
+          label.classList.remove('show');
+          setTimeout(() => set(0), 300);
+        }, 500);
+      }
+
+      function fail(errLabel) {
+        stopCreep();
+        bar.classList.add('error');
+        label.classList.add('error');
+        if (errLabel) setLabel(errLabel);
+        hideTimer = setTimeout(() => {
+          wrap.classList.remove('show');
+          label.classList.remove('show');
+          setTimeout(() => { set(0); bar.classList.remove('error'); label.classList.remove('error'); }, 300);
+        }, 1800);
+      }
+
+      return { start, set, setLabel, creepTo, stopCreep, finish, fail };
+    })();
 
     // ── STATUS ────────────────────────────────────────────────────────────────────
     let sTimer;
