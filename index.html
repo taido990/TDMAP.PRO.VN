@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>TDMAP.PRO.VN-230726</title>
 
-  <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI -->
+  <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
   <link rel="icon" href="app-icon.ico" type="image/x-icon">
   <link rel="shortcut icon" href="app-icon.ico" type="image/x-icon">
@@ -515,6 +515,10 @@
       color: #cc4400;
       margin-bottom: 6px;
       line-height: 1.5;
+    }
+
+    #popupInfo .popup-loaidat-line {
+      margin-bottom: 2px;
     }
 
     #popupInfo .popup-owner-line {
@@ -2794,23 +2798,27 @@
 
       document.getElementById('searchInput').value = p.id;
 
-      // Dòng đầu (thay cho "Tờ-Thửa xx-xx"): Tờ, Thửa, Diện tích, Loại đất (nếu có)
+      // Hàng 1 (tiêu đề, thay cho "Tờ-Thửa xx-xx"): Tờ, Thửa, Diện tích
       const [toNum, thuaNum] = p.id.split('-');
       const infoParts = [`Tờ: ${toNum}`, `Thửa: ${thuaNum}`];
       if (p.dienTich) infoParts.push(`Diện tích: ${p.dienTich}`);
-      if (p.loaiDat) infoParts.push(`Loại đất: ${p.loaiDat}`);
 
       document.getElementById('popupTitle').textContent = infoParts.join(', ');
 
-      // Dòng riêng: Tên chủ - luôn hiển thị nhãn "Tên chủ: ", không ẩn khi trống
+      // Hàng 2: Loại đất (nếu có)
+      const loaiDatLineHtml = p.loaiDat
+        ? `<div class="popup-loaidat-line">Loại đất: ${escapeHtml(p.loaiDat)}</div>`
+        : '';
+
+      // Hàng 3: Tên chủ - luôn hiển thị nhãn "Tên chủ: ", không ẩn khi trống
       const ownerLineHtml = `<div class="popup-owner-line">Tên chủ: ${escapeHtml(p.tenChu || '')}</div>`;
 
-      // Dòng riêng: Trạng thái đăng ký (nếu có)
+      // Hàng 4: Trạng thái đăng ký (nếu có)
       const statusLineHtml = p.trangThaiDK
         ? `<div class="popup-status-line popup-status-${p.trangThaiDK === 'DDK' ? 'ddk' : 'cdk'}">Trạng thái: ${p.trangThaiDK === 'DDK' ? 'Đã đăng ký (DDK)' : 'Chưa đăng ký (CDK)'}</div>`
         : '';
 
-      document.getElementById('popupInfo').innerHTML = `${ownerLineHtml}${statusLineHtml}`;
+      document.getElementById('popupInfo').innerHTML = `${loaiDatLineHtml}${ownerLineHtml}${statusLineHtml}`;
 
       document.getElementById('popupCoords').textContent =
         `${(p.lat || 0).toFixed(7)}, ${(p.lon || 0).toFixed(7)}`;
