@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TDMAP.PRO.VN-190726</title>
+  <title>TDMAP.PRO.VN-230726</title>
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
@@ -517,13 +517,11 @@
       line-height: 1.5;
     }
 
-    #popupInfo .popup-main-line {
-      margin-bottom: 2px;
-    }
-
     #popupInfo .popup-owner-line {
       color: #1a6fd4;
-      margin-bottom: 2px;
+      margin-bottom: 4px;
+      font-size: 17px;
+      font-weight: 800;
     }
 
     #popupInfo .popup-status-line {
@@ -1550,16 +1548,18 @@
           </div>
         </div>
 
-        <div class="drive-field-label"><span>Link thư mục Google Drive</span></div>
-        <input class="drive-input" id="driveFolderInput" type="text"
-          placeholder="https://drive.google.com/drive/folders/...">
+        <div style="display:none;">
+          <div class="drive-field-label"><span>Link thư mục Google Drive</span></div>
+          <input class="drive-input" id="driveFolderInput" type="text"
+            placeholder="https://drive.google.com/drive/folders/...">
+        </div>
 
         <label class="drive-remember-row">
           <input type="checkbox" id="driveRememberChk" checked style="margin:0;">
           Ghi nhớ thư mục cho lần mở sau
         </label>
 
-        <button id="driveListBtn" onclick="listDriveGeojsonFiles()">🔍 Tải danh sách file .geojson</button>
+        <button id="driveListBtn" disabled onclick="listDriveGeojsonFiles()">🔍 Tải danh sách file .geojson</button>
         <div id="driveStatusMsg" style="display:none;"></div>
         <div id="driveFileList"></div>
       </div>
@@ -2794,26 +2794,23 @@
 
       document.getElementById('searchInput').value = p.id;
 
-      document.getElementById('popupTitle').textContent = 'Tờ-Thửa ' + p.id;
-
-      // Dòng 1: Tờ, Thửa, Diện tích, Loại đất (nếu có)
+      // Dòng đầu (thay cho "Tờ-Thửa xx-xx"): Tờ, Thửa, Diện tích, Loại đất (nếu có)
       const [toNum, thuaNum] = p.id.split('-');
       const infoParts = [`Tờ: ${toNum}`, `Thửa: ${thuaNum}`];
       if (p.dienTich) infoParts.push(`Diện tích: ${p.dienTich}`);
       if (p.loaiDat) infoParts.push(`Loại đất: ${p.loaiDat}`);
 
-      // Dòng riêng: Tên chủ (nếu có)
-      const ownerLineHtml = p.tenChu
-        ? `<div class="popup-owner-line">Tên chủ: ${escapeHtml(p.tenChu)}</div>`
-        : '';
+      document.getElementById('popupTitle').textContent = infoParts.join(', ');
+
+      // Dòng riêng: Tên chủ - luôn hiển thị nhãn "Tên chủ: ", không ẩn khi trống
+      const ownerLineHtml = `<div class="popup-owner-line">Tên chủ: ${escapeHtml(p.tenChu || '')}</div>`;
 
       // Dòng riêng: Trạng thái đăng ký (nếu có)
       const statusLineHtml = p.trangThaiDK
         ? `<div class="popup-status-line popup-status-${p.trangThaiDK === 'DDK' ? 'ddk' : 'cdk'}">Trạng thái: ${p.trangThaiDK === 'DDK' ? 'Đã đăng ký (DDK)' : 'Chưa đăng ký (CDK)'}</div>`
         : '';
 
-      document.getElementById('popupInfo').innerHTML =
-        `<div class="popup-main-line">${escapeHtml(infoParts.join(', '))}</div>${ownerLineHtml}${statusLineHtml}`;
+      document.getElementById('popupInfo').innerHTML = `${ownerLineHtml}${statusLineHtml}`;
 
       document.getElementById('popupCoords').textContent =
         `${(p.lat || 0).toFixed(7)}, ${(p.lon || 0).toFixed(7)}`;
@@ -3645,6 +3642,26 @@
       }
     }
 
+    // Kiểm tra 3 ô Tỉnh / Xã / Google API Key đã nhập đúng & đủ hay chưa,
+    // rồi bật/tắt nút "Tải danh sách file .geojson" tương ứng (ô Link thư mục
+    // đã được ẩn khỏi giao diện nên nút này giờ tự lo việc dò thư mục ngầm).
+    function isDriveFormValid() {
+      const provName = document.getElementById('driveProvinceInput').value.trim();
+      const commName = document.getElementById('driveCommuneInput').value.trim();
+      const commCode = document.getElementById('driveCommuneCodeInput').value.trim();
+      const apiKeyRaw = document.getElementById('driveApiKeyInput').value.trim();
+      const provOk = !!provName && provincesMap.has(provName);
+      const commOk = !!commName && communesMap.has(commName) && !!commCode;
+      const keyOk = !!apiKeyRaw;
+      return provOk && commOk && keyOk;
+    }
+
+    function updateDriveListBtnState() {
+      const btn = document.getElementById('driveListBtn');
+      if (!btn) return;
+      btn.disabled = !isDriveFormValid();
+    }
+
     function onProvinceInput() {
       const provName = document.getElementById('driveProvinceInput').value;
       const provCode = provincesMap.get(provName);
@@ -3666,6 +3683,7 @@
 
       if (!provCode) {
         commInput.disabled = true;
+        updateDriveListBtnState();
         return;
       }
 
@@ -3679,6 +3697,8 @@
         opt.value = item["Tên"];
         dlComm.appendChild(opt);
       });
+
+      updateDriveListBtnState();
     }
 
     function onCommuneInput() {
@@ -3688,6 +3708,7 @@
 
       if (!commCode) {
         codeInput.value = '';
+        updateDriveListBtnState();
         return;
       }
 
@@ -3699,12 +3720,22 @@
       const statusEl = document.getElementById('driveStatusMsg');
       statusEl.textContent = '';
       statusEl.style.display = 'none';
+
+      // Tự động gán "Tdmap" vào ô Google API Key để người dùng chỉ cần gõ tiếp
+      // mã xã phía sau (vd: Tdmap24301), thay vì phải tự gõ lại chữ "Tdmap".
+      const apiKeyInput = document.getElementById('driveApiKeyInput');
+      apiKeyInput.value = 'Tdmap';
+      apiKeyInput.focus();
+      apiKeyInput.setSelectionRange(apiKeyInput.value.length, apiKeyInput.value.length);
+
+      updateDriveListBtnState();
     }
 
     // Khi người dùng nhập xong key dạng Tdmap+mã xã (VD: Tdmap24301) → tự tra mã xã
     // trong dữ liệu ĐVHC, điền tỉnh/xã, rồi quét link thư mục và quét file bản đồ.
     let apiKeyDebounceTimer = null;
     function onApiKeyInput() {
+      updateDriveListBtnState();
       clearTimeout(apiKeyDebounceTimer);
       apiKeyDebounceTimer = setTimeout(async () => {
         const apiKeyRaw = document.getElementById('driveApiKeyInput').value.trim();
@@ -3736,6 +3767,7 @@
         onProvinceInput(); // cập nhật danh sách xã của tỉnh
         document.getElementById('driveCommuneInput').value = commName;
         document.getElementById('driveCommuneCodeInput').value = commCode;
+        updateDriveListBtnState();
 
         const apiKey = resolveGdriveApiKey(apiKeyRaw);
         if (!apiKey) {
@@ -3749,48 +3781,52 @@
       }, 800); // debounce 800ms để chờ người dùng gõ xong mã xã
     }
 
-    async function fetchCommuneFolderLink(apiKey, provinceName, communeName, commCode) {
+    // Dò tìm ID thư mục Google Drive của Xã (theo cây thư mục Tỉnh > Mã xã),
+    // dùng chung cho cả luồng tự động (nhập mã bí danh Tdmap+mã xã) lẫn luồng
+    // bấm nút "Tải danh sách" thủ công (vì ô Link thư mục đã được ẩn khỏi UI).
+    async function resolveCommuneFolderId(apiKey, provinceName, communeName, commCode) {
       const rootFolderId = '1D6YJwWRYLi6tsdJl8X2BRav7DGfPFVcK';
-      setDriveStatus('Đang tự động tìm thư mục trên Google Drive...');
 
-      try {
-        // 1. Tìm thư mục Tỉnh
-        let qProv = `name = '${provinceName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and '${rootFolderId}' in parents and trashed = false`;
-        let resProv = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qProv)}&key=${apiKey}&fields=files(id,name)`);
-        let dataProv = await resProv.json();
-        if (!resProv.ok) throw new Error(dataProv.error?.message || 'Lỗi tìm thư mục Tỉnh');
+      // 1. Tìm thư mục Tỉnh
+      let qProv = `name = '${provinceName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and '${rootFolderId}' in parents and trashed = false`;
+      let resProv = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qProv)}&key=${apiKey}&fields=files(id,name)`);
+      let dataProv = await resProv.json();
+      if (!resProv.ok) throw new Error(dataProv.error?.message || 'Lỗi tìm thư mục Tỉnh');
 
+      if (!dataProv.files || dataProv.files.length === 0) {
+        let cleanProv = provinceName.replace(/'/g, "\\'").replace(/^(Tỉnh|Thành phố)\s+/i, '');
+        let qProvFall = `name contains '${cleanProv}' and mimeType = 'application/vnd.google-apps.folder' and '${rootFolderId}' in parents and trashed = false`;
+        resProv = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qProvFall)}&key=${apiKey}&fields=files(id,name)`);
+        dataProv = await resProv.json();
         if (!dataProv.files || dataProv.files.length === 0) {
-          let cleanProv = provinceName.replace(/'/g, "\\'").replace(/^(Tỉnh|Thành phố)\s+/i, '');
-          let qProvFall = `name contains '${cleanProv}' and mimeType = 'application/vnd.google-apps.folder' and '${rootFolderId}' in parents and trashed = false`;
-          resProv = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qProvFall)}&key=${apiKey}&fields=files(id,name)`);
-          dataProv = await resProv.json();
-          if (!dataProv.files || dataProv.files.length === 0) {
-            setDriveStatus(`Không tìm thấy thư mục Tỉnh tương ứng: ${provinceName}`, true);
-            return;
-          }
+          throw new Error(`Không tìm thấy thư mục Tỉnh tương ứng: ${provinceName}`);
         }
-        const provFolderId = dataProv.files[0].id;
+      }
+      const provFolderId = dataProv.files[0].id;
 
-        // 2. Tìm thư mục Xã (Thư mục Xã được đặt tên bằng MÃ XÃ, ví dụ: 24301)
-        let qComm = `name = '${commCode}' and mimeType = 'application/vnd.google-apps.folder' and '${provFolderId}' in parents and trashed = false`;
-        let resComm = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qComm)}&key=${apiKey}&fields=files(id,name)`);
-        let dataComm = await resComm.json();
-        if (!resComm.ok) throw new Error(dataComm.error?.message || 'Lỗi tìm thư mục Xã');
+      // 2. Tìm thư mục Xã (Thư mục Xã được đặt tên bằng MÃ XÃ, ví dụ: 24301)
+      let qComm = `name = '${commCode}' and mimeType = 'application/vnd.google-apps.folder' and '${provFolderId}' in parents and trashed = false`;
+      let resComm = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qComm)}&key=${apiKey}&fields=files(id,name)`);
+      let dataComm = await resComm.json();
+      if (!resComm.ok) throw new Error(dataComm.error?.message || 'Lỗi tìm thư mục Xã');
 
+      if (!dataComm.files || dataComm.files.length === 0) {
+        // Fallback: Thử tìm theo tên xã (trường hợp thư mục không đặt theo mã xã)
+        let cleanComm = communeName.replace(/'/g, "\\'").replace(/^(Xã|Phường|Thị trấn)\s+/i, '');
+        let qCommFall = `name contains '${cleanComm}' and mimeType = 'application/vnd.google-apps.folder' and '${provFolderId}' in parents and trashed = false`;
+        resComm = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qCommFall)}&key=${apiKey}&fields=files(id,name)`);
+        dataComm = await resComm.json();
         if (!dataComm.files || dataComm.files.length === 0) {
-          // Fallback: Thử tìm theo tên xã (trường hợp thư mục không đặt theo mã xã)
-          let cleanComm = communeName.replace(/'/g, "\\'").replace(/^(Xã|Phường|Thị trấn)\s+/i, '');
-          let qCommFall = `name contains '${cleanComm}' and mimeType = 'application/vnd.google-apps.folder' and '${provFolderId}' in parents and trashed = false`;
-          resComm = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qCommFall)}&key=${apiKey}&fields=files(id,name)`);
-          dataComm = await resComm.json();
-          if (!dataComm.files || dataComm.files.length === 0) {
-            setDriveStatus(`Không tìm thấy thư mục Xã (mã ${commCode} hoặc tên ${communeName})`, true);
-            return;
-          }
+          throw new Error(`Không tìm thấy thư mục Xã (mã ${commCode} hoặc tên ${communeName})`);
         }
-        const commFolderId = dataComm.files[0].id;
+      }
+      return dataComm.files[0].id;
+    }
 
+    async function fetchCommuneFolderLink(apiKey, provinceName, communeName, commCode) {
+      setDriveStatus('Đang tự động tìm thư mục trên Google Drive...');
+      try {
+        const commFolderId = await resolveCommuneFolderId(apiKey, provinceName, communeName, commCode);
         document.getElementById('driveFolderInput').value = `https://drive.google.com/drive/folders/${commFolderId}?usp=drive_link`;
         setDriveStatus(`Đã tự động tìm thấy link thư mục Xã. Đang lấy file...`);
 
@@ -3809,6 +3845,7 @@
       folderInput.value = localStorage.getItem(GDRIVE_FOLDER_STORAGE) || GDRIVE_DEFAULT_FOLDER;
       document.getElementById('driveFileList').innerHTML = '';
       setDriveStatus('');
+      updateDriveListBtnState();
       document.getElementById('driveModalOverlay').classList.add('show');
 
       // Hiện ngay danh sách bản đồ đã lưu sẵn trên máy (không cần mạng/API key) —
@@ -3888,6 +3925,7 @@
       document.getElementById('dlCommunes').innerHTML = '';
       document.getElementById('driveFileList').innerHTML = '';
       setDriveStatus('');
+      updateDriveListBtnState();
       showStatus('Đã xóa thiết lập Google Drive đã lưu');
     }
     function setDriveStatus(msg, isError, isHtml = false) {
@@ -3903,26 +3941,47 @@
     }
 
     async function listDriveGeojsonFiles() {
+      const provName = document.getElementById('driveProvinceInput').value.trim();
+      const commName = document.getElementById('driveCommuneInput').value.trim();
+      const commCode = document.getElementById('driveCommuneCodeInput').value.trim();
       const apiKeyRaw = document.getElementById('driveApiKeyInput').value.trim();
       const apiKey = resolveGdriveApiKey(apiKeyRaw);
-      const folderUrl = document.getElementById('driveFolderInput').value.trim();
+      let folderUrl = document.getElementById('driveFolderInput').value.trim();
       const remember = document.getElementById('driveRememberChk').checked;
       const listBtn = document.getElementById('driveListBtn');
       const listEl = document.getElementById('driveFileList');
       listEl.innerHTML = '';
 
+      // Vì ô "Link thư mục Google Drive" đã ẩn khỏi giao diện, nút này chỉ chạy
+      // khi Tỉnh/Xã/API Key đã nhập đúng — sau đó tự dò thư mục tương ứng ngầm.
+      if (!provName || !provincesMap.has(provName)) { setDriveStatus('Vui lòng chọn đúng Tỉnh/Thành trong danh sách gợi ý.', true); return; }
+      if (!commName || !communesMap.has(commName) || !commCode) { setDriveStatus('Vui lòng chọn đúng Xã/Phường trong danh sách gợi ý.', true); return; }
       if (!apiKey) { setDriveStatus('Vui lòng nhập Google API Key (hoặc mã bí danh được cấp) — tạo miễn phí tại Google Cloud Console, bật "Google Drive API".', true); return; }
-      const folderId = extractDriveFolderId(folderUrl);
-      if (!folderId) { setDriveStatus('Link thư mục Google Drive không hợp lệ.', true); return; }
+
+      listBtn.disabled = true;
+
+      let folderId = extractDriveFolderId(folderUrl);
+      if (!folderId) {
+        setDriveStatus('Đang tự động tìm thư mục trên Google Drive...');
+        try {
+          folderId = await resolveCommuneFolderId(apiKey, provName, commName, commCode);
+          folderUrl = `https://drive.google.com/drive/folders/${folderId}?usp=drive_link`;
+          document.getElementById('driveFolderInput').value = folderUrl;
+        } catch (e) {
+          setDriveStatus(`Không tìm thấy thư mục tương ứng: ${e.message}`, true);
+          listBtn.disabled = false;
+          updateDriveListBtnState();
+          return;
+        }
+      }
 
       if (remember) {
         localStorage.setItem(GDRIVE_FOLDER_STORAGE, folderUrl);
         localStorage.setItem(GDRIVE_KEY_STORAGE, apiKeyRaw);
-        localStorage.setItem('tdmap_prov_v1', document.getElementById('driveProvinceInput').value.trim());
-        localStorage.setItem('tdmap_comm_v1', document.getElementById('driveCommuneInput').value.trim());
+        localStorage.setItem('tdmap_prov_v1', provName);
+        localStorage.setItem('tdmap_comm_v1', commName);
       }
 
-      listBtn.disabled = true;
       setDriveStatus('Đang tải danh sách file từ Google Drive...');
 
       try {
@@ -3976,7 +4035,7 @@
       } catch (err) {
         setDriveStatus(`Lỗi khi kết nối Google Drive: ${err.message || err}`, true);
       } finally {
-        listBtn.disabled = false;
+        updateDriveListBtnState();
       }
     }
 
@@ -4172,7 +4231,7 @@
   border: 1px solid rgba(0,0,0,0.15) !important;
   border-radius: 4px !important;
   box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
-  color: #cc0000 !important; font-size: 10px; font-weight: 800;
+  color: #FF0000 !important; font-size: 10px; font-weight: 800;
   padding: 2px 6px !important;
   text-shadow: none;
   pointer-events: none;
@@ -4184,7 +4243,12 @@ body.hide-lbl-bg .lbl-style {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  text-shadow: 0 1px 3px rgba(255,255,255,0.9), 0 0 5px rgba(255,255,255,1) !important;
+  text-shadow:
+    -2px -2px 0 #fff, -1px -2px 0 #fff, 0px -2px 0 #fff, 1px -2px 0 #fff, 2px -2px 0 #fff,
+    -2px  2px 0 #fff, -1px  2px 0 #fff, 0px  2px 0 #fff, 1px  2px 0 #fff, 2px  2px 0 #fff,
+    -2px -1px 0 #fff, -2px  0px 0 #fff, -2px  1px 0 #fff,
+     2px -1px 0 #fff,  2px  0px 0 #fff,  2px  1px 0 #fff,
+    0 0 3px rgba(255,255,255,0.9) !important;
 }
 .lbl-style::before { display: none !important; }
 .lbl-style .lbl-owner {
