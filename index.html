@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TDMAP.PRO.VN-230726</title>
+  <title>TDMAP.PRO.VN-270726</title>
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
@@ -544,6 +544,11 @@
     #popupInfo .popup-status-cdk {
       color: #cc0000;
       background: rgba(204, 0, 0, 0.1);
+    }
+
+    #popupInfo .popup-status-owner {
+      color: #00a3b8;
+      background: rgba(0, 229, 255, 0.15);
     }
 
     #popupCoords {
@@ -2001,7 +2006,14 @@
 
     // Dùng Canvas renderer thay vì SVG mặc định: nhẹ hơn nhiều lần khi vẽ
     // hàng nghìn thửa (mỗi polygon SVG là 1 thẻ DOM riêng, Canvas thì không).
-    const mapCanvasRenderer = L.canvas({ padding: 0.5 });
+    // tolerance: 8 -> MỞ RỘNG vùng bắt chạm quanh viền/khoảng tô mỗi thửa thêm ~8px.
+    // Mặc định Canvas renderer có tolerance = 0 (phải chạm CHÍNH XÁC vào path), khác
+    // với SVG (trình duyệt tự có dung sai bắt sự kiện). Trên một số điện thoại (màn
+    // hình mật độ điểm ảnh cao, cảm ứng kém nhạy, ngón tay to...) chỉ cần lệch 1-2px
+    // là không bắt được tap -> đây là nguyên nhân phổ biến nhất của lỗi "không tap
+    // được vào thửa" trên di động dù vẫn hoạt động bình thường trên máy tính (chuột
+    // click chính xác hơn ngón tay nhiều).
+    const mapCanvasRenderer = L.canvas({ padding: 0.5, tolerance: 8 });
 
     // ── TIỆN ÍCH ──────────────────────────────────────────────────────────────────
     function escapeHtml(str) {
@@ -2486,15 +2498,24 @@
       });
     }
 
-    // Màu tô ranh thửa theo Trạng thái đăng ký (trường 'trangThaiDK'):
-    // - 'DDK' (Đã đăng ký / đã kê khai...)  -> HỒNG
-    // - 'CDK' (Chưa đăng ký) hoặc không có  -> VÀNG (như trước)
+    // Màu tô ranh thửa theo Trạng thái đăng ký (trường 'trangThaiDK') + Tên chủ (trường 'tenChu'):
+    // - 'DDK' (Đã đăng ký / đã kê khai...)                          -> HỒNG
+    // - Chưa đăng ký (CDK/không có) NHƯNG đã có Tên chủ             -> XANH DƯƠNG
+    // - Chưa đăng ký (CDK/không có) VÀ chưa có Tên chủ              -> VÀNG (như trước)
     function getParcelColor(p) {
-      return (p && p.trangThaiDK === 'DDK') ? '#ff1493' : '#ffff00';
+      if (p && p.trangThaiDK === 'DDK') return '#ff1493';
+      if (p && p.tenChu && p.tenChu.trim()) return '#00e5ff';
+      return '#ffff00';
     }
     // Bản mờ (dùng khi lọc tìm kiếm, thửa không khớp) - giữ cùng tông màu, chỉ giảm alpha.
     function getParcelDimColor(p) {
-      return (p && p.trangThaiDK === 'DDK') ? '#ff149333' : '#ffff0033';
+      if (p && p.trangThaiDK === 'DDK') return '#ff149333';
+      if (p && p.tenChu && p.tenChu.trim()) return '#00e5ff33';
+      return '#ffff0033';
+    }
+    // Độ dày viền: đồng nhất 1.5 cho mọi thửa (không phân biệt trạng thái).
+    function getParcelWeight(p) {
+      return 1.5;
     }
 
     // Tạo polygon + dot + tooltip cho 1 thửa (chỉ tạo 1 LẦN DUY NHẤT, tái sử dụng
@@ -2503,11 +2524,18 @@
       const baseColor = getParcelColor(p);
       const poly = L.polygon(p.rings, {
         renderer: mapCanvasRenderer,
-        color: baseColor, weight: (p.trangThaiDK === 'DDK' ? 2.5 : 1.5),
+        color: baseColor, weight: getParcelWeight(p),
         fillColor: baseColor, fillOpacity: 0.06,
         interactive: true, bubblingMouseEvents: false
       });
-      poly.on('click tap', () => openPopup(p));
+      poly.on('click tap', e => {
+        // Đánh dấu sự kiện gốc đã được xử lý bởi thửa (poly/dot), để map.on('click')
+        // (bên dưới) KHÔNG đóng popup ngay sau khi vừa mở - đây là nguyên nhân
+        // chính khiến một số điện thoại bị "không tap được vào thửa": popup mở
+        // ra rồi bị đóng lại gần như tức thì trong cùng 1 thao tác chạm.
+        if (e && e.originalEvent) e.originalEvent._handled = true;
+        openPopup(p);
+      });
 
       const dot = L.circleMarker([p.lat, p.lon], {
         renderer: mapCanvasRenderer,
@@ -2515,7 +2543,10 @@
         fillColor: '#1a6fd4', fillOpacity: 1,
         interactive: true, bubblingMouseEvents: false
       });
-      dot.on('click tap', () => openPopup(p));
+      dot.on('click tap', e => {
+        if (e && e.originalEvent) e.originalEvent._handled = true;
+        openPopup(p);
+      });
 
       // Nhãn trên bản đồ: dòng 1 = Tờ-Thửa, dòng 2 = Tên chủ (không kèm trạng thái).
       // Trạng thái đăng ký chỉ hiển thị khi click vào thửa (xem trong popup).
@@ -2786,7 +2817,7 @@
     function openPopup(p) {
       hideSuggestions();
       if (activeP && activeP._poly)
-        activeP._poly.setStyle({ color: getParcelColor(activeP), weight: (activeP.trangThaiDK === 'DDK' ? 2.5 : 1.5), fillOpacity: 0.06 });
+        activeP._poly.setStyle({ color: getParcelColor(activeP), weight: getParcelWeight(activeP), fillOpacity: 0.06 });
 
       activeP = p;
       // Đảm bảo thửa có mặt trên bản đồ dù đang ở ngoài khung nhìn hiện tại (vd:
@@ -2813,10 +2844,15 @@
       // Hàng 3: Tên chủ - luôn hiển thị nhãn "Tên chủ: ", không ẩn khi trống
       const ownerLineHtml = `<div class="popup-owner-line">Tên chủ: ${escapeHtml(p.tenChu || '')}</div>`;
 
-      // Hàng 4: Trạng thái đăng ký (nếu có)
-      const statusLineHtml = p.trangThaiDK
-        ? `<div class="popup-status-line popup-status-${p.trangThaiDK === 'DDK' ? 'ddk' : 'cdk'}">Trạng thái: ${p.trangThaiDK === 'DDK' ? 'Đã đăng ký (DDK)' : 'Chưa đăng ký (CDK)'}</div>`
-        : '';
+      // Hàng 4: Trạng thái đăng ký
+      // - Đã đăng ký (DDK)                              -> hồng
+      // - Chưa đăng ký nhưng đã có Tên chủ               -> xanh lá
+      // - Chưa đăng ký và chưa có Tên chủ                -> đỏ (CDK, như trước)
+      const isDdk = p.trangThaiDK === 'DDK';
+      const hasOwner = !!(p.tenChu && p.tenChu.trim());
+      const statusClass = isDdk ? 'ddk' : (hasOwner ? 'owner' : 'cdk');
+      const statusText = isDdk ? 'Đã đăng ký (DDK)' : (hasOwner ? 'Chưa đăng ký (đã có tên chủ)' : 'Chưa đăng ký (CDK)');
+      const statusLineHtml = `<div class="popup-status-line popup-status-${statusClass}">Trạng thái: ${statusText}</div>`;
 
       document.getElementById('popupInfo').innerHTML = `${loaiDatLineHtml}${ownerLineHtml}${statusLineHtml}`;
 
@@ -2860,7 +2896,7 @@
     function closePopup() {
       document.getElementById('popup').classList.remove('open');
       if (activeP && activeP._poly)
-        activeP._poly.setStyle({ color: getParcelColor(activeP), weight: (activeP.trangThaiDK === 'DDK' ? 2.5 : 1.5), fillOpacity: 0.06 });
+        activeP._poly.setStyle({ color: getParcelColor(activeP), weight: getParcelWeight(activeP), fillOpacity: 0.06 });
       activeP = null;
     }
 
