@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TDMAP.PRO.VN-270726</title>
+  <title>TDMAP.PRO.VN-280726</title>
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server -->
@@ -443,6 +443,35 @@
       background: #00c6a7;
       border-color: #00c6a7;
       color: #06231d;
+    }
+
+    /* CONTROL "NỀN NHÃN" (đã chuyển từ góc trên-phải xuống hàng control này để đỡ chật màn hình điện thoại) */
+    #labelBgControl {
+      display: flex;
+      align-items: center;
+      background: rgba(10, 18, 28, 0.9);
+      border: 1px solid rgba(0, 198, 167, 0.5);
+      border-radius: 20px;
+      padding: 5px 12px;
+      flex-shrink: 0;
+    }
+
+    #labelBgControl label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #9fb3c0;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    #labelBgControl input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: #00c6a7;
+      cursor: pointer;
     }
 
     /* POPUP BẢN ĐỒ */
@@ -1359,20 +1388,32 @@
   background:#ffffff;
   border:1px solid rgba(0,0,0,0.08); border-radius:10px;
   padding:6px 12px; box-shadow:0 2px 10px rgba(0,0,0,0.15);
-  display:flex; align-items:center; gap:8px;
+  display:flex; flex-direction:column; align-items:flex-end; gap:6px;
 ">
-    <label
-      style="font-size:11px; font-weight:700; color:#555; display:flex; align-items:center; gap:4px; cursor:pointer;"
-      title="Ẩn/hiện nền trắng của nhãn thửa">
-      <input type="checkbox" id="toggleLblBg" onchange="document.body.classList.toggle('hide-lbl-bg', !this.checked)">
-      Nền nhãn
-    </label>
-    <div id="mapStats"
-      style="display:none; font-size:11.5px; font-weight:800; color:#ff1493; background:rgba(255,20,147,0.12); padding:3px 8px; border-radius:6px; white-space:nowrap; cursor:pointer;"
-      title="Nhấn để xem chi tiết theo loại đất" onclick="toggleMapStatsDetail()">
-      --
+    <div style="display:flex; align-items:center; gap:8px;">
+      <div id="mapStats"
+        style="display:none; font-size:11.5px; font-weight:800; color:#ff1493; background:rgba(255,20,147,0.12); padding:3px 8px; border-radius:6px; white-space:nowrap; cursor:pointer;"
+        title="Nhấn để xem chi tiết theo loại đất" onclick="toggleMapStatsDetail()">
+        --
+      </div>
+      <span style="font-size:12px;font-weight:800;color:#00c6a7;letter-spacing:1.2px;">TDMAP.PRO.VN</span>
     </div>
-    <span style="font-size:12px;font-weight:800;color:#00c6a7;letter-spacing:1.2px;">TDMAP.PRO.VN</span>
+
+    <div style="display:flex; align-items:center; gap:10px;">
+      <label
+        style="font-size:11px; font-weight:700; color:#555; display:flex; align-items:center; gap:4px; cursor:pointer;"
+        title="Tô màu ranh thửa theo Tên chủ: XANH NGỌC = đã có tên chủ, VÀNG = chưa có tên chủ (giống thửa chưa đăng ký)">
+        <input type="checkbox" id="toggleOwnerColor" checked onchange="setOwnerColorMode(this.checked)">
+        Tên chủ
+      </label>
+      <label
+        style="font-size:11px; font-weight:700; color:#555; display:flex; align-items:center; gap:4px; cursor:pointer;"
+        title="Ẩn/hiện nền trắng phía sau nhãn thửa trên bản đồ">
+        <input type="checkbox" id="toggleLblBg" onchange="setLabelBgMode(this.checked)">
+        Nền nhãn
+      </label>
+    </div>
+
     <div id="mapStatsDetail"
       style="display:none; position:absolute; top:calc(100% + 6px); right:0; background:#fff; border:1px solid rgba(0,0,0,0.1); border-radius:8px; padding:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:max-content; min-width:220px; max-height:400px; overflow-y:auto; cursor:default;">
     </div>
@@ -2333,14 +2374,19 @@
     }
     // Render theo từng lô nhỏ (chunk) bằng requestAnimationFrame để nhường quyền
     // điều khiển cho trình duyệt giữa các lô -> tránh treo "Page Unresponsive"
-    // kể cả với dữ liệu >3000 thửa.
-    const RENDER_CHUNK_SIZE = 120;
+    // kể cả với dữ liệu >3000 thửa. (Kích thước lô giờ tự co giãn theo ngân sách
+    // thời gian rảnh thực tế — xem scheduleChunk/step bên dưới.)
 
     // requestIdleCallback mượt hơn rAF khi rảnh, nhưng không phải trình duyệt nào
-    // cũng hỗ trợ -> có fallback về rAF.
+    // cũng hỗ trợ -> có fallback về rAF. Với rAF, tự tạo "deadline" giả (ngân sách
+    // ~8ms mỗi khung hình, chừa lại thời gian cho trình duyệt vẽ khung hình kịp
+    // 60fps) để vòng lặp chia lô phía dưới xử lý đồng nhất trên mọi trình duyệt.
     const scheduleChunk = window.requestIdleCallback
       ? (fn) => requestIdleCallback(fn, { timeout: 100 })
-      : (fn) => requestAnimationFrame(fn);
+      : (fn) => requestAnimationFrame(() => {
+        const start = performance.now();
+        fn({ timeRemaining: () => Math.max(0, 8 - (performance.now() - start)), didTimeout: false });
+      });
 
     // Chỉ hiện nhãn (tooltip) VÀ chấm điểm giữa thửa khi zoom đủ lớn, đồng thời
     // chỉ bind/add cho các thửa đang nằm TRONG khung nhìn hiện tại (không phải
@@ -2478,13 +2524,22 @@
 
     // Xây lưới + tính sẵn bbox và chuỗi thường-không-dấu-hoa (cache) cho tìm kiếm,
     // tránh phải tính lại toLowerCase() cho 30.000-50.000 thửa mỗi lần gõ phím.
+    // Đồng thời cộng dồn luôn bounds tổng thể (dùng số thuần, không tạo LatLng
+    // object cho từng điểm như bounds.extend()) để KHÔNG phải duyệt lại toàn bộ
+    // tọa độ 1 lần nữa chỉ để tính bounds — file lớn có thể có hàng trăm nghìn
+    // điểm, duyệt 1 lần thay vì 2 lần giúp mở file nhanh hơn đáng kể.
     function buildSpatialIndex(list) {
       spatialGrid = new Map();
+      let gMinLat = Infinity, gMaxLat = -Infinity, gMinLon = Infinity, gMaxLon = -Infinity;
       list.forEach(p => {
         computeParcelBBox(p);
         p._idLower = (p.id || '').toLowerCase();
         p._tenChuLower = (p.tenChu || '').toLowerCase();
         if (p._minLat == null) return;
+        if (p._minLat < gMinLat) gMinLat = p._minLat;
+        if (p._maxLat > gMaxLat) gMaxLat = p._maxLat;
+        if (p._minLon < gMinLon) gMinLon = p._minLon;
+        if (p._maxLon > gMaxLon) gMaxLon = p._maxLon;
         const i0 = Math.floor(p._minLat / GRID_CELL_DEG), i1 = Math.floor(p._maxLat / GRID_CELL_DEG);
         const j0 = Math.floor(p._minLon / GRID_CELL_DEG), j1 = Math.floor(p._maxLon / GRID_CELL_DEG);
         for (let i = i0; i <= i1; i++) {
@@ -2496,21 +2551,86 @@
           }
         }
       });
+      if (gMinLat === Infinity) return null;
+      return L.latLngBounds([gMinLat, gMinLon], [gMaxLat, gMaxLon]);
+    }
+
+    // ── HIỂN THỊ MÀU RANH THEO TÊN CHỦ + NỀN NHÃN — ghi nhớ lựa chọn cho lần mở sau ──
+    const OWNER_COLOR_STORAGE_KEY = 'tdmap_showOwnerColor';
+    const LABEL_BG_STORAGE_KEY = 'tdmap_showLabelBg';
+
+    // Checkbox "Tên chủ": mặc định BẬT (tích) khi mở lần đầu -> tô ranh theo tên chủ
+    // (xanh ngọc = có tên chủ). Nếu người dùng đã từng đổi, dùng lại lựa chọn cũ.
+    let SHOW_OWNER_COLOR = (() => {
+      try {
+        const saved = localStorage.getItem(OWNER_COLOR_STORAGE_KEY);
+        if (saved === '0') return false;
+        if (saved === '1') return true;
+      } catch (e) { /* localStorage có thể bị chặn — bỏ qua */ }
+      return true;
+    })();
+
+    // Checkbox "Nền nhãn": giữ nguyên mặc định cũ là TẮT (không tích) khi mở lần đầu.
+    let SHOW_LABEL_BG = (() => {
+      try {
+        const saved = localStorage.getItem(LABEL_BG_STORAGE_KEY);
+        if (saved === '1') return true;
+        if (saved === '0') return false;
+      } catch (e) { /* localStorage có thể bị chặn — bỏ qua */ }
+      return false;
+    })();
+
+    // Đồng bộ trạng thái 2 checkbox + class body theo giá trị đã lưu (chạy ngay vì
+    // script này nằm cuối <body>, các thẻ input phía trên đã tồn tại trong DOM).
+    (function initColorAndLabelBgControls() {
+      const ownerChk = document.getElementById('toggleOwnerColor');
+      if (ownerChk) ownerChk.checked = SHOW_OWNER_COLOR;
+      const bgChk = document.getElementById('toggleLblBg');
+      if (bgChk) bgChk.checked = SHOW_LABEL_BG;
+      document.body.classList.toggle('hide-lbl-bg', !SHOW_LABEL_BG);
+    })();
+
+    function setLabelBgMode(checked) {
+      SHOW_LABEL_BG = !!checked;
+      document.body.classList.toggle('hide-lbl-bg', !SHOW_LABEL_BG);
+      try { localStorage.setItem(LABEL_BG_STORAGE_KEY, SHOW_LABEL_BG ? '1' : '0'); } catch (e) { /* bỏ qua */ }
+    }
+
+    function setOwnerColorMode(checked) {
+      SHOW_OWNER_COLOR = !!checked;
+      try { localStorage.setItem(OWNER_COLOR_STORAGE_KEY, SHOW_OWNER_COLOR ? '1' : '0'); } catch (e) { /* bỏ qua */ }
+      refreshParcelColorsOnMap();
+      showStatus(SHOW_OWNER_COLOR ? 'Đã bật màu ranh theo Tên chủ' : 'Đã tắt màu ranh theo Tên chủ');
+    }
+
+    // Áp dụng lại màu cho các thửa ĐANG hiển thị trên bản đồ (renderedSet) sau khi
+    // bật/tắt checkbox "Tên chủ" — không cần vẽ lại toàn bộ layer, rất nhanh.
+    // Nếu đang có bộ lọc tìm kiếm hoạt động thì chạy lại lọc để màu luôn nhất quán.
+    function refreshParcelColorsOnMap() {
+      const searchInputEl = document.getElementById('searchInput');
+      if (searchInputEl && searchInputEl.value.trim()) { runSearchFilter(); return; }
+      renderedSet.forEach(p => {
+        if (p._poly) {
+          const c = getParcelColor(p);
+          p._poly.setStyle({ color: c, fillColor: c });
+        }
+      });
     }
 
     // Màu tô ranh thửa theo Trạng thái đăng ký (trường 'trangThaiDK') + Tên chủ (trường 'tenChu'):
-    // - 'DDK' (Đã đăng ký / đã kê khai...)                          -> HỒNG
-    // - Chưa đăng ký (CDK/không có) NHƯNG đã có Tên chủ             -> XANH DƯƠNG
-    // - Chưa đăng ký (CDK/không có) VÀ chưa có Tên chủ              -> VÀNG (như trước)
+    // - 'DDK' (Đã đăng ký / đã kê khai...)                              -> HỒNG (luôn giữ, không phụ thuộc checkbox)
+    // - Checkbox "Tên chủ" ĐANG TẮT                                     -> VÀNG cho mọi thửa chưa DDK
+    // - Checkbox "Tên chủ" ĐANG BẬT + có Tên chủ (chưa đăng ký)         -> XANH NGỌC
+    // - Checkbox "Tên chủ" ĐANG BẬT + chưa có Tên chủ (chưa đăng ký)    -> VÀNG
     function getParcelColor(p) {
       if (p && p.trangThaiDK === 'DDK') return '#ff1493';
-      if (p && p.tenChu && p.tenChu.trim()) return '#00e5ff';
+      if (SHOW_OWNER_COLOR && p && p.tenChu && p.tenChu.trim()) return '#00e5ff';
       return '#ffff00';
     }
     // Bản mờ (dùng khi lọc tìm kiếm, thửa không khớp) - giữ cùng tông màu, chỉ giảm alpha.
     function getParcelDimColor(p) {
       if (p && p.trangThaiDK === 'DDK') return '#ff149333';
-      if (p && p.tenChu && p.tenChu.trim()) return '#00e5ff33';
+      if (SHOW_OWNER_COLOR && p && p.tenChu && p.tenChu.trim()) return '#00e5ff33';
       return '#ffff0033';
     }
     // Độ dày viền: đồng nhất 1.5 cho mọi thửa (không phân biệt trạng thái).
@@ -2702,11 +2822,26 @@
         }
 
         // Danh sách lớn (lần tải file đầu tiên, khi khung nhìn còn bao trọn cả khu
-        // vực) -> chia lô nhỏ bằng requestIdleCallback/rAF để không treo giao diện.
+        // vực) -> chia lô theo NGÂN SÁCH THỜI GIAN thực tế còn lại mỗi khung rảnh
+        // (deadline.timeRemaining()), thay vì số lượng cố định. Trình duyệt nhàn
+        // rỗi thì xử lý được nhiều thửa hơn mỗi lượt -> mở file nhanh hơn; máy đang
+        // bận thì tự động xử lý ít hơn mỗi lượt -> vẫn không bao giờ treo giao diện.
         let k = 0;
-        function step() {
-          const end = Math.min(k + RENDER_CHUNK_SIZE, toAdd.length);
-          for (; k < end; k++) ensureParcelOnMap(toAdd[k]);
+        const HARD_CAP_PER_CHUNK = 2000; // chặn an toàn, phòng khi deadline báo sai
+        function step(deadline) {
+          const hasDeadline = deadline && typeof deadline.timeRemaining === 'function';
+          let doneInChunk = 0;
+          while (k < toAdd.length) {
+            ensureParcelOnMap(toAdd[k]);
+            k++;
+            doneInChunk++;
+            // Chỉ kiểm tra ngân sách mỗi 40 thửa (gọi timeRemaining() liên tục mỗi
+            // vòng cũng có phí tổn riêng, không đáng để kiểm tra từng thửa 1).
+            if (doneInChunk % 40 === 0) {
+              if (doneInChunk >= HARD_CAP_PER_CHUNK) break;
+              if (hasDeadline && deadline.timeRemaining() <= 0) break;
+            }
+          }
           if (onProgress) onProgress(k / toAdd.length);
           if (k < toAdd.length) {
             scheduleChunk(step);
@@ -2716,7 +2851,7 @@
             resolveSync();
           }
         }
-        step();
+        scheduleChunk(step);
       });
     }
 
@@ -2761,23 +2896,15 @@
       // sẽ cộng dồn sai qua nhiều lần mở file trong cùng 1 phiên làm việc.
       materializedCount = 0;
 
-      // Tính bounds tổng thể trực tiếp từ tọa độ (KHÔNG cần tạo polygon trước) ->
-      // rất nhanh dù có 30.000-50.000+ thửa, vì chỉ là vòng lặp cộng dồn số học.
-      // Dùng bounds.extend() thay vì gom mảng khổng lồ rồi spread (có thể vượt
-      // giới hạn tham số của JS và làm trình duyệt treo cứng khi dữ liệu lớn).
-      const bounds = L.latLngBounds();
-      list.forEach(p => {
-        if (p.rings && p.rings.length) {
-          for (const ring of p.rings) for (const pt of ring) bounds.extend(pt);
-        } else if (p.lat != null && p.lon != null) {
-          bounds.extend([p.lat, p.lon]);
-        }
-      });
+      // Xây lưới chỉ mục không gian (cho viewport culling) + cache chuỗi tìm kiếm.
+      // Hàm này duyệt qua toàn bộ tọa độ 1 LẦN DUY NHẤT và trả về luôn bounds
+      // tổng thể (tính bằng số thuần, không tạo LatLng cho từng điểm như
+      // bounds.extend()) — trước đây phải duyệt riêng 1 lần nữa chỉ để tính
+      // bounds, với file lớn (hàng trăm nghìn điểm) việc gộp lại giúp mở file
+      // nhanh hơn rõ rệt.
+      const bounds = buildSpatialIndex(list);
 
-      // Xây lưới chỉ mục không gian (cho viewport culling) + cache chuỗi tìm kiếm
-      buildSpatialIndex(list);
-
-      if (bounds.isValid()) map.fitBounds(bounds, { padding: [60, 60], maxZoom: 17 });
+      if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding: [60, 60], maxZoom: 17 });
 
       // Chỉ vẽ các thửa trong khung nhìn (+ vùng đệm) hiện tại, theo từng lô nhỏ
       // để không treo giao diện. Các thửa còn lại sẽ tự động được vẽ/gỡ khi
@@ -2817,7 +2944,7 @@
     function openPopup(p) {
       hideSuggestions();
       if (activeP && activeP._poly)
-        activeP._poly.setStyle({ color: getParcelColor(activeP), weight: getParcelWeight(activeP), fillOpacity: 0.06 });
+        activeP._poly.setStyle({ color: getParcelColor(activeP), fillColor: getParcelColor(activeP), weight: getParcelWeight(activeP), fillOpacity: 0.06 });
 
       activeP = p;
       // Đảm bảo thửa có mặt trên bản đồ dù đang ở ngoài khung nhìn hiện tại (vd:
@@ -2896,7 +3023,7 @@
     function closePopup() {
       document.getElementById('popup').classList.remove('open');
       if (activeP && activeP._poly)
-        activeP._poly.setStyle({ color: getParcelColor(activeP), weight: getParcelWeight(activeP), fillOpacity: 0.06 });
+        activeP._poly.setStyle({ color: getParcelColor(activeP), fillColor: getParcelColor(activeP), weight: getParcelWeight(activeP), fillOpacity: 0.06 });
       activeP = null;
     }
 
@@ -2944,7 +3071,7 @@
         // Chỉ cần khôi phục màu cho các thửa ĐANG hiển thị trên bản đồ, không phải
         // toàn bộ allParcels (những thửa chưa vẽ không có style gì để khôi phục).
         renderedSet.forEach(p => {
-          if (p._poly) p._poly.setStyle({ color: getParcelColor(p), fillOpacity: 0.06 });
+          if (p._poly) p._poly.setStyle({ color: getParcelColor(p), fillColor: getParcelColor(p), fillOpacity: 0.06 });
           if (p._dot) p._dot.setStyle({ fillColor: '#1a6fd4', fillOpacity: 1 });
         });
         hideSuggestions();
@@ -2955,7 +3082,7 @@
       allParcels.forEach(p => {
         const isPartial = matchParcel(p, q);
         if (p._poly) {
-          p._poly.setStyle({ color: isPartial ? '#00ffcc' : getParcelDimColor(p), fillOpacity: isPartial ? 0.2 : 0.02 });
+          p._poly.setStyle({ color: isPartial ? '#00ffcc' : getParcelDimColor(p), fillColor: isPartial ? '#00ffcc' : getParcelDimColor(p), fillOpacity: isPartial ? 0.2 : 0.02 });
         }
         if (p._dot) {
           p._dot.setStyle({ fillColor: isPartial ? '#00c6a7' : '#1a6fd4', fillOpacity: isPartial ? 1 : 0.2 });
@@ -3931,9 +4058,8 @@
         item.innerHTML = `<span class="dfi-icon">🗺️</span><span class="dfi-name"></span><span class="dfi-go">Mở ngay ▸</span>`;
         item.querySelector('.dfi-name').textContent = `${c.fileName} · lưu ${savedDate}`;
         item.onclick = async () => {
-          FileProgress.start('📦 Đang mở dữ liệu đã lưu trên máy...');
+          FileProgress.start(`📦 Đang mở "${c.fileName}" từ dữ liệu đã lưu trên máy...`);
           FileProgress.set(40);
-          setDriveStatus(`📦 Đang mở "${c.fileName}" từ dữ liệu đã lưu trên máy...`);
           const ok = await processMapText(c.text, c.fileName, 40);
           if (ok) { closeDriveModal(); showStatus(`✓ Mở "${c.fileName}" từ bộ nhớ máy (ngoại tuyến)`); }
         };
@@ -4089,9 +4215,8 @@
       if (modifiedTime) {
         const cached = await LocalMapCache.get(fileId);
         if (cached && cached.modifiedTime === modifiedTime && cached.text) {
-          FileProgress.start('📦 Đang mở dữ liệu đã lưu trên máy...');
+          FileProgress.start(`📦 Đang mở "${fileName}" từ dữ liệu đã lưu trên máy...`);
           FileProgress.set(40);
-          setDriveStatus(`📦 Đang mở "${fileName}" từ dữ liệu đã lưu trên máy...`);
           await new Promise(r => setTimeout(r, 30));
           const ok = await processMapText(cached.text, fileName, 40);
           if (ok) { closeDriveModal(); showStatus(`✓ Mở "${fileName}" từ bộ nhớ máy (ngoại tuyến)`); }
@@ -4131,9 +4256,9 @@
             <div style="width:100%; background:#e0e0e0; height:6px; border-radius:3px; margin-top:6px; overflow:hidden;">
               <div style="width:${percent}%; background:#00c6a7; height:100%; transition:width 0.1s;"></div>
             </div>`;
-              setDriveStatus(html, false, true);
-              FileProgress.set(percent * 0.5); // giai đoạn tải mạng chiếm 0-50% của tổng tiến trình
               FileProgress.setLabel(`Đang tải "${fileName}"... ${percent}%`);
+              FileProgress.set(percent * 0.5); // giai đoạn tải mạng chiếm 0-50% của tổng tiến trình
+              setDriveStatus(html, false, true); // hiển thị % tải mạng thật (0-100%) trong khung popup, chạy sau để không bị ghi đè bởi % tổng-tiến-trình đã gộp ở trên
             } else {
               let mb = (loaded / (1024 * 1024)).toFixed(1);
               setDriveStatus(`Đang tải "${fileName}"... ${mb} MB`);
@@ -4147,7 +4272,7 @@
           text = await res.text();
         }
 
-        setDriveStatus(`Đang phân tích dữ liệu bản đồ...`);
+        FileProgress.setLabel(`Đang phân tích dữ liệu bản đồ...`);
         FileProgress.set(50);
         // Chờ 1 chút để UI kịp render trạng thái
         await new Promise(r => setTimeout(r, 50));
@@ -4189,6 +4314,46 @@
       const label = document.getElementById('fileProgressLabel');
       let hideTimer = null;
       let creepTimer = null;
+      let curLabelText = '';
+
+      let lastMirrorPct = -1;
+      let lastMirrorTime = 0;
+
+      // Đồng bộ % trực tiếp vào khung popup "Mở file .geojson từ Google Drive"
+      // (#driveStatusMsg) khi popup đang mở, để người dùng thấy % chạy NGAY
+      // trong khung mình đang nhìn, thay vì chỉ chạy ở thanh mờ trên cùng.
+      // Có throttle: trong lúc dựng hàng chục nghìn polygon, hàm này có thể bị
+      // gọi rất nhiều lần liên tiếp (mỗi lô nhỏ 1 lần) — ghi lại innerHTML mỗi
+      // lần như vậy tốn CPU, tranh giành với chính CPU mà vòng lặp render đang
+      // cần. Chỉ thực sự ghi DOM khi % thay đổi đủ nhiều hoặc đã đủ lâu kể từ
+      // lần ghi trước, trừ khi force=true (dùng cho start/finish/fail — luôn
+      // phải hiện ngay, không được bỏ qua).
+      function syncModalStatus(percent, isError, force) {
+        const overlay = document.getElementById('driveModalOverlay');
+        if (!overlay || !overlay.classList.contains('show')) return;
+        const el = document.getElementById('driveStatusMsg');
+        if (!el) return;
+        const pct = Math.round(Math.max(0, Math.min(100, percent)));
+        if (!force) {
+          const now = performance.now();
+          if (pct === lastMirrorPct) return;
+          if ((now - lastMirrorTime) < 120 && Math.abs(pct - lastMirrorPct) < 2) return;
+          lastMirrorTime = now;
+        }
+        lastMirrorPct = pct;
+        const barColor = isError ? '#d9534f' : '#00c6a7';
+        // Nếu label đã tự kèm sẵn % (vd giai đoạn tải mạng) thì không ghi đè
+        // số %, chỉ vẽ thêm thanh tiến trình cho trực quan.
+        const headline = /%/.test(curLabelText)
+          ? curLabelText
+          : `${curLabelText} <strong style="color:${barColor};">${pct}%</strong>`;
+        el.style.display = 'block';
+        el.innerHTML = `${headline}
+          <div style="width:100%; background:#e0e0e0; height:6px; border-radius:3px; margin-top:6px; overflow:hidden;">
+            <div style="width:${pct}%; background:${barColor}; height:100%; transition:width 0.15s;"></div>
+          </div>`;
+        el.classList.toggle('error', !!isError);
+      }
 
       function start(initialLabel) {
         clearTimeout(hideTimer);
@@ -4198,15 +4363,20 @@
         bar.style.width = '0%';
         wrap.classList.add('show');
         setLabel(initialLabel || 'Đang bắt đầu...');
+        lastMirrorPct = -1;
+        syncModalStatus(0, false, true);
       }
 
       function setLabel(txt) {
+        curLabelText = txt || '';
         label.textContent = txt;
         label.classList.add('show');
       }
 
-      function set(percent) {
-        bar.style.width = Math.max(0, Math.min(100, percent)) + '%';
+      function set(percent, opts) {
+        const p = Math.max(0, Math.min(100, percent));
+        bar.style.width = p + '%';
+        if (!opts || opts.mirror !== false) syncModalStatus(p);
       }
 
       // "Bò" dần từ mốc hiện tại tới gần targetPercent (không chạm hẳn) trong lúc
@@ -4227,8 +4397,9 @@
 
       function finish(finalLabel) {
         stopCreep();
-        set(100);
+        set(100, { mirror: false });
         if (finalLabel) setLabel(finalLabel);
+        syncModalStatus(100, false, true);
         hideTimer = setTimeout(() => {
           wrap.classList.remove('show');
           label.classList.remove('show');
@@ -4241,6 +4412,7 @@
         bar.classList.add('error');
         label.classList.add('error');
         if (errLabel) setLabel(errLabel);
+        syncModalStatus(parseFloat(bar.style.width) || 0, true, true);
         hideTimer = setTimeout(() => {
           wrap.classList.remove('show');
           label.classList.remove('show');
