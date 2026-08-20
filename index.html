@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TDMAP.PRO.VN-280726</title>
+  <title>TDMAP.PRO.VN-200826</title>
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server  -->
@@ -240,8 +240,9 @@
       opacity: 0.8;
     }
 
-    /* NÚT VỊ TRÍ */
-    #locateBtn {
+    /* NÚT VỊ TRÍ + NÚT ĐỊNH VỊ KHI DI CHUYỂN (dùng chung style) */
+    #locateBtn,
+    #navModeBtn {
       width: 36px;
       height: 36px;
       border-radius: 50%;
@@ -257,11 +258,13 @@
       margin-bottom: 10px;
     }
 
-    #locateBtn:active {
+    #locateBtn:active,
+    #navModeBtn:active {
       transform: scale(.9);
     }
 
-    #locateBtn.locating {
+    #locateBtn.locating,
+    #navModeBtn.locating {
       background: #e8f4ff;
       border-color: #1a6fd4;
       animation: pulse 1.2s infinite;
@@ -270,6 +273,14 @@
     #locateBtn.located {
       background: #e8fff8;
       border-color: #00c6a7;
+    }
+
+    /* NÚT "ĐỊNH VỊ KHI DI CHUYỂN" khi đang bật theo dõi liên tục - màu cam để phân
+       biệt rõ với nút "Vị trí của tôi" (màu xanh lá khi bật), tránh nhầm 2 chế độ. */
+    #navModeBtn.active {
+      background: #fff4e8;
+      border-color: #ff9800;
+      animation: pulse-orange 1.2s infinite;
     }
 
     @keyframes pulse {
@@ -282,6 +293,29 @@
       50% {
         box-shadow: 0 0 0 8px rgba(26, 111, 212, .15)
       }
+    }
+
+    @keyframes pulse-orange {
+
+      0%,
+      100% {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, .3)
+      }
+
+      50% {
+        box-shadow: 0 0 0 8px rgba(255, 152, 0, .18)
+      }
+    }
+
+    /* CỤM NÚT 🧭/📍/+/- (Leaflet corner 'topright') - ĐÃ CHUYỂN LÊN SÁT DƯỚI
+       THANH TÌM KIẾM (bên phải), thay vì nằm ở góc dưới-phải màn hình như trước,
+       cùng lý do với #labelZoomControl ở trên: tránh bị bảng thông tin thửa che
+       mất khi mở popup. top:160px chỉ là giá trị mặc định ban đầu, JS
+       (adjustTopLayout) sẽ tự tính lại theo chiều cao thật của thanh tìm kiếm.
+       Độ đặc hiệu (2 class) của selector này CAO HƠN rule mặc định ".leaflet-top"
+       của thư viện Leaflet (1 class) nên luôn thắng, bất kể thứ tự nạp CSS. */
+    .leaflet-top.leaflet-right {
+      top: 160px;
     }
 
     /* STATUS */
@@ -343,12 +377,8 @@
     #fileProgressLabel.show { opacity: 1; }
     #fileProgressLabel.error { color: #ff8a80; border-color: rgba(231,76,60,.6); }
 
-    /* BADGE MỨC ZOOM */
+    /* BADGE MỨC ZOOM - nằm ở thanh trên cùng, cùng hàng với nút HSQ Xã */
     #zoomBadge {
-      position: fixed;
-      top: 15px;
-      left: 15px;
-      z-index: 1001;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -386,16 +416,18 @@
       box-shadow: 0 0 6px rgba(255, 193, 7, .8);
     }
 
-    /* HÀNG CHỨA: CONTROL CHỌN NGƯỠNG ZOOM + NÚT HSQ XÃ (cùng 1 hàng, tự xuống dòng trên điện thoại) */
+    /* CỘT CHỨA: BADGE ZOOM (trên) + NÚT HSQ XÃ (dưới), xếp DỌC (không còn nằm
+       ngang) để không bao giờ bị lấn sang phải và chồng lên panel "TDMAP.PRO.VN"
+       (checkbox Tên chủ/Nền nhãn) ở góc trên-phải trên màn hình điện thoại hẹp. */
     #topControlsRow {
       position: fixed;
-      top: 53px;
+      top: 15px;
       left: 15px;
       z-index: 1001;
       display: flex;
-      align-items: center;
+      flex-direction: column;
+      align-items: flex-start;
       gap: 8px;
-      flex-wrap: wrap;
       max-width: calc(100vw - 30px);
     }
 
@@ -403,34 +435,50 @@
       max-width: calc(100vw - 30px);
     }
 
-    /* CONTROL CHỌN NGƯỚNG ZOOM HIỆN NHÃN */
+    /* CONTROL CHỌN NGƯỠNG ZOOM HIỆN NHÃN - ĐÃ CHUYỂN LÊN SÁT DƯỚI THANH TÌM KIẾM
+       (bên trái), thay vì nằm ở góc dưới-trái màn hình như trước: khi bảng thông
+       tin thửa (popup) mở ra che gần hết nửa dưới màn hình, control ở đáy màn
+       hình cũ sẽ bị đè lên - đưa lên gần thanh tìm kiếm (luôn ở phần trên, popup
+       không che tới) để tránh chồng đè. Vị trí top:160px chỉ là GIÁ TRỊ MẶC ĐỊNH
+       ban đầu - hàm adjustTopLayout() sẽ tự tính lại chính xác theo chiều cao
+       thật của thanh tìm kiếm (thay đổi tuỳ độ dài nội dung/kích thước màn hình).
+       Vẫn giữ dạng thanh dọc nhỏ gọn như trước. */
     #labelZoomControl {
+      position: fixed;
+      left: 12px;
+      top: 160px;
+      z-index: 1001;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
       background: rgba(10, 18, 28, 0.9);
       border: 1px solid rgba(0, 198, 167, 0.5);
-      border-radius: 20px;
-      padding: 5px 10px 5px 14px;
-      flex-shrink: 0;
+      border-radius: 12px;
+      padding: 6px 5px;
     }
 
     #labelZoomControl .lzc-label {
-      font-size: 10px;
-      font-weight: 700;
-      color: #9fb3c0;
-      white-space: nowrap;
+      font-size: 13px;
+      line-height: 1;
+      margin-bottom: 1px;
+    }
+
+    #lzcBtnCol {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
     }
 
     .lzc-btn {
       border: 1px solid rgba(255, 255, 255, 0.18);
       background: transparent;
       color: #cfd8dc;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
-      width: 24px;
-      height: 22px;
-      border-radius: 6px;
+      width: 22px;
+      height: 19px;
+      border-radius: 5px;
       cursor: pointer;
       transition: background .15s, border-color .15s, color .15s;
     }
@@ -1431,6 +1479,7 @@
         <polygon points="50,6 50,60 94,88" fill="#00AC47" />
         <polygon points="6,88 94,88 50,60" fill="#FFBA00" />
       </svg></button>
+    <button id="excelBtn" onclick="openExcelModal()" title="Cập nhật tên chủ / xóa thửa theo danh sách Excel">📊 Excel</button>
   </div>
   <div id="searchSuggestions"></div>
   <input type="file" id="fileInput"
@@ -1441,19 +1490,25 @@
   <div id="fileProgressLabel"></div>
 
   <div id="statusPill" style="opacity:0">–</div>
-  <div id="zoomBadge"><span class="zb-dot"></span><span id="zoomBadgeText">Zoom 13</span></div>
+
   <div id="topControlsRow">
-    <div id="labelZoomControl">
-      <span class="lzc-label">Nhãn từ zoom:</span>
+    <div id="zoomBadge"><span class="zb-dot"></span><span id="zoomBadgeText">Zoom 13</span></div>
+
+    <button id="hsqXaBtn" title="Link HSQ chung của Xã (ngoài danh sách thửa trong file)" onclick="openHsqXaLink()">
+      <span class="ico">🗂️</span> HSQ Ngoài Danh Sách
+    </button>
+  </div>
+
+  <!-- Control chọn ngưỡng zoom hiện nhãn - đặt độc lập ở góc dưới-trái, thu gọn,
+       tách khỏi thanh trên để không chiếm chỗ màn hình điện thoại. -->
+  <div id="labelZoomControl" title="Nhãn/điểm tự hiện từ mức zoom đã chọn">
+    <span class="lzc-label">🏷️</span>
+    <div id="lzcBtnCol">
       <button class="lzc-btn" data-zoom="16">16</button>
       <button class="lzc-btn" data-zoom="17">17</button>
       <button class="lzc-btn" data-zoom="18">18</button>
       <button class="lzc-btn" data-zoom="19">19</button>
     </div>
-
-    <button id="hsqXaBtn" title="Link HSQ chung của Xã (ngoài danh sách thửa trong file)" onclick="openHsqXaLink()">
-      <span class="ico">🗂️</span> HSQ Ngoài Danh Sách
-    </button>
   </div>
 
   <div id="popup">
@@ -1517,6 +1572,7 @@
     <p>📂<br>Thả file KML/GeoJSON vào đây</p>
   </div>
 
+  <button id="navModeBtn" title="Định vị khi di chuyển (tự theo dõi liên tục)" onclick="toggleNavMode()">🧭</button>
   <button id="locateBtn" title="Vị trí của tôi" onclick="locateMe()">📍</button>
 
   <div id="customAlertOverlay">
@@ -1619,8 +1675,57 @@
     </div>
   </div>
 
+  <div id="excelModalOverlay" class="modal-overlay">
+    <div class="modal-box" style="max-width:540px;">
+      <div class="modal-header">📊 Cập nhật tên chủ / Xóa thửa theo danh sách Excel</div>
+      <div class="modal-body">
+        <p style="margin:0 0 10px;color:#666;font-size:12.5px;">
+          Chọn file Excel (.xlsx/.xls) chứa danh sách Tờ-Thửa của file <b>.geojson đang mở trên bản đồ</b>, sau đó
+          chọn đúng cột tương ứng bên dưới.
+        </p>
+        <input type="file" id="excelFileInput" accept=".xlsx,.xls" onchange="handleExcelFile(this.files[0])">
+
+        <div id="excelColumnsWrap" style="display:none;">
+          <div style="display:flex; gap:10px;">
+            <div style="flex:1;">
+              <div class="drive-field-label"><span>Cột Tờ</span></div>
+              <select class="drive-input" id="excelColTo" onchange="onExcelColumnsChange()"></select>
+            </div>
+            <div style="flex:1;">
+              <div class="drive-field-label"><span>Cột Thửa</span></div>
+              <select class="drive-input" id="excelColThua" onchange="onExcelColumnsChange()"></select>
+            </div>
+          </div>
+          <div class="drive-field-label"><span>Cột Tên chủ (dùng khi cập nhật tên chủ)</span></div>
+          <select class="drive-input" id="excelColTenChu" onchange="onExcelColumnsChange()"></select>
+
+          <div id="excelPreviewSummary" style="margin:10px 0 6px; font-size:12.5px; font-weight:700; color:#444;">
+          </div>
+          <div id="excelPreviewTableWrap"
+            style="max-height:220px; overflow:auto; border:1px solid #eee; border-radius:8px;"></div>
+
+          <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
+            <button class="modal-btn primary" style="flex:1;min-width:180px;" onclick="applyExcelUpdateOwner()">✏️
+              Cập nhật tên chủ theo danh sách</button>
+            <button class="modal-btn" style="flex:1;min-width:180px;background:#d9534f;"
+              onclick="applyExcelDeleteParcels()">🗑️ Xóa thửa theo danh sách</button>
+          </div>
+          <button class="modal-btn secondary" style="width:100%;margin-top:8px;"
+            onclick="downloadUpdatedGeoJSON()">⬇️ Tải file GeoJSON đã cập nhật</button>
+
+          <div id="excelActionLog" style="margin-top:10px; font-size:12.5px; color:#444; white-space:pre-line;">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn secondary" onclick="closeExcelModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <!-- TỐI ƯU: dvhc2025.js (danh mục 63 tỉnh + hàng nghìn xã) chỉ cần cho tính năng
        Google Drive, KHÔNG cần để hiển thị bản đồ. Trước đây tải đồng bộ (blocking)
        ngay đầu <head> khiến MỌI người dùng phải chờ file này tải+chạy xong mới
@@ -1709,13 +1814,19 @@
         }),
         interactive: false, zIndexOffset: 1000
       }).addTo(map);
-      const btn = document.getElementById('locateBtn');
-      btn.classList.remove('locating');
-      btn.classList.add('located');
-      btn.textContent = '🔵';
+      // Lưu ý: hàm này CHỈ vẽ chấm/vòng tròn vị trí lên bản đồ, KHÔNG tự đổi trạng
+      // thái nút bấm nào - vì có 2 nút dùng chung hàm này (locateBtn "Vị trí của
+      // tôi" và navModeBtn "Định vị khi di chuyển"), mỗi nút tự quản lý class/icon
+      // của chính nó (xem locateMe() và toggleNavMode() bên dưới).
+    }
+
+    function clearLocateMarker() {
+      if (locateMarker) { map.removeLayer(locateMarker); locateMarker = null; }
+      if (locateCircle) { map.removeLayer(locateCircle); locateCircle = null; }
     }
 
     function setRouteMode(mode) {
+
       routeMode = mode;
       document.querySelectorAll('.dirModeBtn').forEach(b =>
         b.classList.toggle('active', b.dataset.mode === mode));
@@ -1918,61 +2029,193 @@
     }
 
     // ── LOCATE ───────────────────────────────────────────────────────────────────
+    // Có 2 nút TÁCH BIỆT hoàn toàn, không dùng chung 1 chế độ:
+    //   📍 locateBtn  = "Vị trí của tôi"      -> định vị 1 LẦN, đứng yên tại chỗ,
+    //                                            KHÔNG tự theo dõi liên tục, nên
+    //                                            không bao giờ gây giật bản đồ khi
+    //                                            đang chạm chọn thửa.
+    //   🧭 navModeBtn = "Định vị khi di chuyển" -> bật theo dõi GPS LIÊN TỤC
+    //                                            (watchPosition) và bản đồ tự động
+    //                                            bám theo vị trí khi bạn di chuyển,
+    //                                            dùng cho lúc đi thực địa. Bấm lại
+    //                                            để tắt.
+    // 2 nút dùng chung 1 chấm/vòng tròn vị trí trên bản đồ (locateMarker/locateCircle)
+    // nhưng chỉ 1 chế độ hoạt động tại 1 thời điểm - bật chế độ này sẽ tự tắt chế
+    // độ kia để tránh xung đột (2 watch cùng chạy, nút hiển thị sai trạng thái...).
     let locateMarker = null;
     let locateCircle = null;
+    let staticLocateActive = false; // true khi 📍 đang hiển thị vị trí (định vị 1 lần)
+    let locateWatchId = null;       // khác null = 🧭 đang bật theo dõi vị trí liên tục
+    let navFirstFix = true;         // lần định vị đầu tiên của phiên 🧭 hiện tại -> bay tới; các lần sau chỉ lướt nhẹ theo
 
+    function resetLocateButtons() {
+      const staticBtn = document.getElementById('locateBtn');
+      staticBtn.classList.remove('locating', 'located');
+      staticBtn.textContent = '📍';
+      const navBtn = document.getElementById('navModeBtn');
+      navBtn.classList.remove('locating', 'active');
+      navBtn.textContent = '🧭';
+    }
+
+    // ── 📍 "Vị trí của tôi" — định vị 1 lần, đứng yên tại chỗ ──────────────────────
+    // Bấm lần 1: xác định vị trí hiện tại rồi hiển thị chấm trên bản đồ (đứng yên,
+    // không tự cập nhật liên tục). Bấm lần nữa (khi đang hiển thị): tắt đi.
     function locateMe() {
       if (!navigator.geolocation) {
         showStatus('Trình duyệt không hỗ trợ định vị');
         return;
       }
+      // Đang ở chế độ "định vị khi di chuyển" -> tắt trước để tránh 2 chế độ chạy
+      // song song (một cái đứng yên, một cái liên tục di chuyển bản đồ).
+      if (locateWatchId !== null) stopNavMode();
+
+      if (staticLocateActive) {
+        map.stop(); // dừng ngay animation bay/lướt đang chạy dở (nếu có) khi tắt
+        clearLocateMarker();
+        staticLocateActive = false;
+        resetLocateButtons();
+        // QUAN TRỌNG: trên điện thoại, lúc trình duyệt hiện hộp thoại xin quyền vị
+        // trí (và cả lúc ẩn thanh địa chỉ khi cuộn/tương tác) kích thước THẬT SỰ
+        // của khung nhìn có thể đã thay đổi, nhưng Leaflet KHÔNG tự biết để tính
+        // lại toạ độ pixel <-> lat/lng nếu không có sự kiện 'resize' rõ ràng (nhiều
+        // trình duyệt di động không bắn 'resize' khi thanh địa chỉ ẩn/hiện) -> bản
+        // đồ vẫn dùng kích thước/gốc toạ độ CŨ đã lệch để tính chạm -> chạm vào
+        // đúng vị trí thửa trên MÀN HÌNH nhưng Leaflet lại hiểu là chạm trúng chỗ
+        // KHÁC trên bản đồ (không trúng polygon nào) -> hoàn toàn không phản ứng
+        // gì, dù chạm đúng thửa. invalidateSize() ép Leaflet đo lại kích thước
+        // khung bản đồ + tính lại toạ độ ngay lúc này, khắc phục triệt để. Gọi
+        // ngay LẪN có độ trễ nhỏ để chắc chắn bắt kịp cả khi UI trình duyệt còn
+        // đang settle (ẩn/hiện thanh địa chỉ thường mất thêm ~300ms nữa).
+        map.invalidateSize();
+        setTimeout(() => map.invalidateSize(), 350);
+        showStatus('Đã tắt định vị');
+        return;
+      }
+
       const btn = document.getElementById('locateBtn');
+      btn.classList.remove('located');
       btn.classList.add('locating');
       btn.textContent = '⌛';
       showStatus('Đang xác định vị trí…');
 
       navigator.geolocation.getCurrentPosition(
         pos => {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-          const acc = pos.coords.accuracy;
+          // Hộp thoại xin quyền vị trí của trình duyệt cũng có thể làm lệch kích
+          // thước khung nhìn thật của trang trên điện thoại -> đo lại cho chắc,
+          // trước cả khi bay/lướt tới vị trí (xem giải thích đầy đủ ở nhánh tắt
+          // định vị bên dưới).
+          map.invalidateSize();
+          const lat = pos.coords.latitude, lon = pos.coords.longitude, acc = pos.coords.accuracy;
+          placeLocateMarker(lat, lon, acc);
+          const curZoom = map.getZoom();
+          if (curZoom < 17) map.flyTo([lat, lon], 17, { animate: true, duration: 1.2 });
+          else map.panTo([lat, lon], { animate: true, duration: 0.6 });
 
-          if (locateMarker) map.removeLayer(locateMarker);
-          if (locateCircle) map.removeLayer(locateCircle);
-
-          locateCircle = L.circle([lat, lon], {
-            radius: acc, color: '#1a6fd4', weight: 1,
-            fillColor: '#1a6fd4', fillOpacity: 0.12, interactive: false
-          }).addTo(map);
-
-          locateMarker = L.marker([lat, lon], {
-            icon: L.divIcon({
-              className: '',
-              html: `<div style="
-            width:16px;height:16px;border-radius:50%;
-            background:#1a6fd4;border:3px solid #fff;
-            box-shadow:0 0 0 3px rgba(26,111,212,.4);
-          "></div>`,
-              iconSize: [16, 16], iconAnchor: [8, 8]
-            }),
-            interactive: false, zIndexOffset: 1000
-          }).addTo(map);
-
-          map.flyTo([lat, lon], 17, { duration: 1.2 });
-
+          staticLocateActive = true;
           btn.classList.remove('locating');
           btn.classList.add('located');
           btn.textContent = '🔵';
           showStatus(`Vị trí của bạn · độ chính xác ±${Math.round(acc)}m`);
         },
         err => {
-          btn.classList.remove('locating');
-          btn.textContent = '📍';
           const msgs = { 1: 'Bị từ chối quyền định vị', 2: 'Không xác định được vị trí', 3: 'Hết thời gian chờ' };
           showStatus(msgs[err.code] || 'Lỗi định vị');
+          btn.classList.remove('locating');
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
+      );
+    }
+
+    // ── 🧭 "Định vị khi di chuyển" — theo dõi liên tục, bản đồ tự bám theo ─────────
+    // Bấm lần 1: bật watchPosition, mỗi lần có toạ độ GPS mới thì cập nhật chấm vị
+    // trí VÀ tự động panTo bản đồ theo, để luôn thấy mình đang ở đâu giữa các thửa
+    // khi đi thực địa. Bấm lần nữa (bất kể đang chờ định vị hay đã có vị trí): tắt
+    // theo dõi. Vì đây là chế độ được bật CHỦ ĐỘNG (khác 📍), việc bản đồ tự bám
+    // theo trong lúc đang bật là hành vi mong muốn của chế độ, không phải lỗi.
+    function toggleNavMode() {
+      if (!navigator.geolocation) {
+        showStatus('Trình duyệt không hỗ trợ định vị');
+        return;
+      }
+      if (locateWatchId !== null) {
+        stopNavMode();
+        return;
+      }
+      startNavMode();
+    }
+
+    function startNavMode() {
+      // Đang ở chế độ "Vị trí của tôi" -> tắt trước, tránh 2 chế độ song song.
+      if (staticLocateActive) {
+        clearLocateMarker();
+        staticLocateActive = false;
+      }
+
+      const btn = document.getElementById('navModeBtn');
+      btn.classList.remove('active');
+      btn.classList.add('locating');
+      btn.textContent = '⌛';
+      showStatus('Đang xác định vị trí…');
+      navFirstFix = true;
+
+      locateWatchId = navigator.geolocation.watchPosition(
+        pos => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const acc = pos.coords.accuracy;
+
+          placeLocateMarker(lat, lon, acc);
+
+          if (navFirstFix) {
+            // Hộp thoại xin quyền vị trí có thể vừa làm lệch kích thước khung nhìn
+            // thật trên điện thoại - đo lại ngay lần fix đầu tiên (xem giải thích ở
+            // nhánh tắt định vị trong stopNavMode()).
+            map.invalidateSize();
+            map.flyTo([lat, lon], 17, { animate: true, duration: 1.2 });
+            navFirstFix = false;
+          } else if (!mapPointerActive) {
+            // Bỏ qua lần "tự lướt theo" này nếu người dùng đang chạm bản đồ (xem
+            // giải thích ở khai báo mapPointerActive) - GPS vẫn còn theo dõi liên
+            // tục nên lần fix kế tiếp (vài giây sau, lúc chắc chắn không còn chạm)
+            // sẽ tự bắt kịp vị trí mới nhất, không cần xử lý gì thêm ở đây.
+            map.panTo([lat, lon], { animate: true, duration: 0.5 });
+          }
+
+          btn.classList.remove('locating');
+          btn.classList.add('active');
+          btn.textContent = '🧭';
+          showStatus(`Đang di chuyển · độ chính xác ±${Math.round(acc)}m`);
+        },
+        err => {
+          const msgs = { 1: 'Bị từ chối quyền định vị', 2: 'Không xác định được vị trí', 3: 'Hết thời gian chờ' };
+          showStatus(msgs[err.code] || 'Lỗi định vị');
+          stopNavMode();
         },
         { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
       );
+    }
+
+    function stopNavMode() {
+      if (locateWatchId !== null) {
+        navigator.geolocation.clearWatch(locateWatchId);
+        locateWatchId = null;
+      }
+      // QUAN TRỌNG: nếu vừa có 1 lần panTo() đang chạy dở (hiệu ứng bay/lướt 0.5s
+      // theo GPS) đúng lúc bấm tắt, animation đó vẫn tiếp tục chạy thêm vài trăm
+      // mili-giây SAU KHI đã tắt (clearWatch chỉ chặn các lần GPS mới, không huỷ
+      // animation đang chạy dở) -> nếu người dùng chạm chọn 1 thửa ngay trong lúc
+      // đó, thửa vẫn đang trôi dưới ngón tay y như lúc còn bật -> lại chọn không
+      // được, dù đã bấm tắt. map.stop() dừng animation đang chạy dở NGAY LẬP TỨC,
+      // giữ nguyên vị trí bản đồ hiện tại, đảm bảo tắt là dừng hẳn, không còn trôi.
+      map.stop();
+      clearLocateMarker();
+      resetLocateButtons();
+      // Ép Leaflet đo lại kích thước khung bản đồ + tính lại toạ độ pixel <-> lat/lng
+      // ngay lúc tắt (xem giải thích chi tiết ở nhánh tắt của locateMe() phía trên -
+      // cùng nguyên nhân/cách khắc phục, áp dụng cho cả 2 nút 📍 và 🧭).
+      map.invalidateSize();
+      setTimeout(() => map.invalidateSize(), 350);
+      showStatus('Đã tắt định vị khi di chuyển');
     }
 
     // ── MAP ───────────────────────────────────────────────────────────────────────
@@ -1990,6 +2233,23 @@
         const barRect = searchBar.getBoundingClientRect();
         suggestions.style.top = Math.round(barRect.bottom + 8) + 'px';
       }
+
+      // Đưa control chọn ngưỡng nhãn (trái) + cụm nút 🧭/📍/+/- (phải, góc Leaflet
+      // 'topright') xuống NGAY DƯỚI thanh tìm kiếm - để khi bảng thông tin thửa mở
+      // ra (che gần hết nửa dưới màn hình) 2 cụm này KHÔNG bị đè lên, vì chúng
+      // luôn nằm ở phần trên màn hình. Tính lại mỗi lần layout đổi (xoay màn hình,
+      // đổi cỡ chữ trình duyệt...) để luôn khớp với chiều cao thật của thanh tìm
+      // kiếm thay vì đoán cứng 1 giá trị pixel.
+      const searchBarRect = searchBar.getBoundingClientRect();
+      const belowSearchTop = Math.round(searchBarRect.bottom + 10);
+      const labelZoomControl = document.getElementById('labelZoomControl');
+      if (labelZoomControl) labelZoomControl.style.top = belowSearchTop + 'px';
+      // Lúc gọi lần đầu (ngay khi script chạy), bản đồ Leaflet + các control 🧭/📍/+/-
+      // CHƯA được tạo (map khởi tạo ở đoạn code phía dưới) -> phần tử ".leaflet-top.
+      // leaflet-right" chưa tồn tại trong DOM -> querySelector trả về null, bỏ qua an
+      // toàn; các lần gọi lại sau (load/resize/setTimeout) sẽ tìm thấy và set đúng.
+      const topRightCorner = document.querySelector('.leaflet-top.leaflet-right');
+      if (topRightCorner) topRightCorner.style.top = belowSearchTop + 'px';
     }
     window.addEventListener('load', adjustTopLayout);
     window.addEventListener('resize', adjustTopLayout);
@@ -2030,10 +2290,28 @@
     L.control.attribution({ position: 'bottomright', prefix: '' })
       .addAttribution('© Google · TDMAP.PRO.VN').addTo(map);
 
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    // ── CỤM NÚT 🧭/📍/+/- - CHUYỂN TỪ GÓC DƯỚI-PHẢI LÊN GÓC TRÊN-PHẢI ────────────────
+    // (position: 'topright' thay vì 'bottomright' như trước) để khi bảng thông
+    // tin thửa (popup) mở lên che gần hết nửa dưới màn hình, cụm nút này không bị
+    // đè/che mất - luôn nằm ở phần trên màn hình, ngay dưới thanh tìm kiếm (vị trí
+    // top chính xác do adjustTopLayout() tự tính, xem hàm đó phía trên).
+    // Thứ tự ADD quan trọng: góc 'topright' của Leaflet xếp control thêm SAU xuống
+    // PHÍA DƯỚI control thêm trước (ngược với góc 'bottomright' cũ dùng
+    // column-reverse) -> để giữ đúng thứ tự hiển thị từ trên xuống như trước
+    // (🧭 di chuyển → 📍 vị trí của tôi → +/- zoom), phải thêm NavModeControl
+    // trước, LocateControl kế tiếp, rồi mới đến control zoom (+/-) sau cùng.
+    const NavModeControl = L.Control.extend({
+      options: { position: 'topright' },
+      onAdd: function () {
+        const btn = document.getElementById('navModeBtn');
+        L.DomEvent.disableClickPropagation(btn);
+        return btn;
+      }
+    });
+    map.addControl(new NavModeControl());
 
     const LocateControl = L.Control.extend({
-      options: { position: 'bottomright' },
+      options: { position: 'topright' },
       onAdd: function () {
         const btn = document.getElementById('locateBtn');
         L.DomEvent.disableClickPropagation(btn);
@@ -2042,18 +2320,64 @@
     });
     map.addControl(new LocateControl());
 
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    // Gọi lại NGAY sau khi các control 🧭/📍/+/- vừa được tạo xong (thay vì chỉ chờ
+    // setTimeout 300ms ở trên) - để định vị đúng chỗ ngay từ đầu, tránh nhấp nháy
+    // sai vị trí thoáng qua lúc tải trang.
+    adjustTopLayout();
+
     map.setView([12.7, 108.2], 13);
+
+    // ── TẠM DỪNG TỰ-PAN KHI NGƯỜI DÙNG ĐANG CHẠM BẢN ĐỒ ─────────────────────────────
+    // Khi chế độ 🧭 "Định vị khi di chuyển" đang bật, mỗi lần có toạ độ GPS mới bản
+    // đồ tự panTo() theo (xem startNavMode). Nếu đúng lúc đó người dùng đang đặt/
+    // nhấc ngón tay để CHỌN 1 THỬA, bản đồ bị dịch chuyển ngay GIỮA thao tác chạm
+    // (giữa lúc đặt ngón tay xuống và lúc nhấc lên) -> thửa đang ở dưới ngón tay bị
+    // trôi sang vị trí khác trước khi ngón tay nhấc lên -> chạm trượt ra ngoài ranh
+    // thửa -> KHÔNG bắn được sự kiện click lên thửa nào -> không hiện thông tin.
+    // Đây chính là nguyên nhân của lỗi "định vị/di chuyển xong không chọn được
+    // thửa". Khắc phục: theo dõi lúc nào có ngón tay/con trỏ đang thật sự chạm
+    // trên bản đồ (pointerdown -> pointerup/cancel), và bỏ qua panTo() trong
+    // khoảng đó - chấm vị trí GPS vẫn cập nhật bình thường, chỉ việc "tự lướt
+    // theo" bị hoãn lại đúng bằng thời gian thao tác chạm (thường < 1 giây),
+    // không ảnh hưởng cảm giác "bám theo" khi đang đi bộ/lái xe.
+    let mapPointerActive = false;
+    const mapContainerEl = map.getContainer();
+    mapContainerEl.addEventListener('pointerdown', () => { mapPointerActive = true; }, { passive: true });
+    mapContainerEl.addEventListener('pointerup', () => { mapPointerActive = false; }, { passive: true });
+    mapContainerEl.addEventListener('pointercancel', () => { mapPointerActive = false; }, { passive: true });
+
+    // ── TỰ ĐỘNG invalidateSize() MỖI KHI KHUNG NHÌN TRÌNH DUYỆT THẬT SỰ ĐỔI KÍCH
+    //    THƯỚC (không chỉ riêng lúc bật/tắt định vị) ─────────────────────────────
+    // Trước đây chỉ gọi map.invalidateSize() ngay lúc bật/tắt 📍/🧭, nhưng thanh
+    // địa chỉ trên điện thoại có thể ẩn/hiện (làm đổi chiều cao khung nhìn) bất cứ
+    // lúc nào trong lúc người dùng CUỘN/KÉO bản đồ tay - kể cả SAU KHI đã tắt định
+    // vị từ trước - không chỉ đúng khoảnh khắc bật/tắt. Nếu không báo cho Leaflet
+    // biết, nó vẫn dùng kích thước/gốc toạ độ CŨ để tính chạm -> chạm đúng thửa
+    // trên màn hình nhưng tính sai vị trí trên bản đồ -> không chọn được thửa dù
+    // đã kéo tới đúng khu vực có dữ liệu. window.visualViewport là API chính xác
+    // nhất để bắt sự kiện này trên điện thoại (bắn đúng lúc thanh địa chỉ/bàn phím
+    // ảo ẩn-hiện làm đổi khung nhìn thật); 'resize' của window là lớp dự phòng cho
+    // trình duyệt không hỗ trợ visualViewport.
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => map.invalidateSize());
+    }
+    window.addEventListener('resize', () => map.invalidateSize());
 
     // Dùng Canvas renderer thay vì SVG mặc định: nhẹ hơn nhiều lần khi vẽ
     // hàng nghìn thửa (mỗi polygon SVG là 1 thẻ DOM riêng, Canvas thì không).
-    // tolerance: 8 -> MỞ RỘNG vùng bắt chạm quanh viền/khoảng tô mỗi thửa thêm ~8px.
-    // Mặc định Canvas renderer có tolerance = 0 (phải chạm CHÍNH XÁC vào path), khác
-    // với SVG (trình duyệt tự có dung sai bắt sự kiện). Trên một số điện thoại (màn
-    // hình mật độ điểm ảnh cao, cảm ứng kém nhạy, ngón tay to...) chỉ cần lệch 1-2px
-    // là không bắt được tap -> đây là nguyên nhân phổ biến nhất của lỗi "không tap
-    // được vào thửa" trên di động dù vẫn hoạt động bình thường trên máy tính (chuột
-    // click chính xác hơn ngón tay nhiều).
-    const mapCanvasRenderer = L.canvas({ padding: 0.5, tolerance: 8 });
+    // tolerance: 15 -> MỞ RỘNG vùng bắt chạm quanh viền mỗi thửa thêm ~15px (tăng
+    // từ 8 lên 15 sau khi xác nhận qua log debug trên điện thoại thật: bản đồ tính
+    // ĐÚNG toạ độ chạm, nhưng ngón tay lệch ra ngoài ranh thửa vài-chục pixel do
+    // viền/khoảng tô mỗi thửa khá mảnh và mờ (fillOpacity thấp), khó nhìn chính
+    // xác trên màn hình nhỏ. Mặc định Canvas renderer có tolerance = 0 (phải chạm
+    // CHÍNH XÁC vào path), khác với SVG (trình duyệt tự có dung sai bắt sự kiện).
+    // Lưu ý: tolerance chỉ mở rộng vùng bắt quanh VIỀN (đường path); phần RUỘT bên
+    // trong polygon vốn đã luôn bắt chạm chính xác 100% không cần tolerance - nếu
+    // chạm hẳn vào giữa 1 thửa mà vẫn không trúng thì đó là bằng chứng ngón tay
+    // thực sự đã chạm ra ngoài ranh giới thật của thửa đó (không phải lỗi phần mềm).
+    const mapCanvasRenderer = L.canvas({ padding: 0.5, tolerance: 15 }).addTo(map);
 
     // ── TIỆN ÍCH ──────────────────────────────────────────────────────────────────
     function escapeHtml(str) {
@@ -2066,7 +2390,19 @@
     let allParcels = [];
     let allLayers = [];
     let activeP = null;
+    // Mốc thời gian lần cuối 1 thửa (poly/dot) vừa được tap/click, dùng để map.on('click')
+    // bên dưới biết mà KHÔNG đóng popup ngay sau khi vừa mở. Dùng biến thời gian thay vì
+    // đánh dấu lên e.originalEvent vì trên di động, sự kiện "tap" giả lập của Leaflet đôi khi
+    // là 1 object khác với sự kiện "click" mà map nhận được -> đánh dấu trên originalEvent bị
+    // mất, khiến popup mở ra rồi bị đóng lại tức thì (thửa không chọn được / như bị "treo").
+    let lastParcelClickAt = 0;
     let ranhThonLayers = [];
+    let currentLoadedFileName = '';
+
+    // ── EXCEL: dữ liệu đọc từ file Excel đang chọn trong modal "Cập nhật tên chủ / Xóa thửa" ──
+    let excelHeaders = [];   // tên các cột (theo dòng tiêu đề đầu tiên của sheet)
+    let excelRows = [];      // toàn bộ dòng dữ liệu, dạng {tênCột: giá trị}
+    let excelMatchList = []; // danh sách đã đối chiếu với allParcels: [{key, to, thua, tenChu, found}]
 
     // ── KML PARSER ────────────────────────────────────────────────────────────────
     // Trả về { parcels, ranhThon: { lines, labels } }
@@ -2440,7 +2776,7 @@
         const inView = p.lat != null && p.lon != null && viewBounds.contains([p.lat, p.lon]);
         if (inView) {
           if (!p._lblBound) { p._poly.bindTooltip(p._lbl); p._lblBound = true; }
-          if (p._dot && !p._dotAdded) { p._dot.addTo(map); p._dotAdded = true; }
+          if (p._dot && !p._dotAdded) { p._dot.addTo(map); p._dot.redraw(); p._dotAdded = true; }
         } else {
           if (p._lblBound) { p._poly.unbindTooltip(); p._lblBound = false; }
           if (p._dot && p._dotAdded) { map.removeLayer(p._dot); p._dotAdded = false; }
@@ -2519,6 +2855,56 @@
       return p._minLat != null &&
         p._minLat <= maxLat && p._maxLat >= minLat &&
         p._minLon <= maxLon && p._maxLon >= minLon;
+    }
+
+    // ── CHẨN ĐOÁN CHẠM HỤT (TẠM THỜI) ────────────────────────────────────────────
+    // Ray-casting kiểm tra 1 điểm (lat,lon) có nằm trong 1 ring (đa giác) hay không.
+    function pointInRing(lat, lon, ring) {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const yi = ring[i][0], xi = ring[i][1];
+        const yj = ring[j][0], xj = ring[j][1];
+        const intersect = ((yi > lat) !== (yj > lat)) &&
+          (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+    // ── LƯỚI AN TOÀN TẦNG ỨNG DỤNG (tự tìm thửa theo hình học, KHÔNG phụ thuộc cơ
+    //    chế click nội bộ của Leaflet Canvas) ──────────────────────────────────────
+    // Sau nhiều lần chẩn đoán thực tế, xác nhận: có trường hợp 1 thửa đang thật sự
+    // ở trên bản đồ (_onMap=true, hasPoly=true) và điểm chạm nằm ĐÚNG bên trong
+    // ranh giới thật (đã tính đúng cả phần lỗ/suối), NHƯNG Leaflet vẫn không tự
+    // bắn được sự kiện click lên polygon đó (nguyên nhân sâu bên trong cơ chế
+    // hit-test của Canvas renderer, dù đã thử nhiều cách vá vẫn chưa dứt điểm).
+    // Thay vì tiếp tục dò lỗi nội bộ thư viện, dùng NGAY phép toán hình học này
+    // (đã kiểm chứng chính xác qua log thực tế) làm nguồn xác định chính, gọi
+    // trực tiếp openPopup() khi xác định chắc chắn chạm trúng 1 thửa - xem
+    // map.on('click') bên dưới. Dùng spatialGrid để chỉ quét ứng viên gần điểm
+    // chạm (nhanh, không cần duyệt hết allParcels dù file có 30-50 nghìn thửa).
+    function findParcelAtPoint(lat, lon) {
+      const i = Math.floor(lat / GRID_CELL_DEG), j = Math.floor(lon / GRID_CELL_DEG);
+      const candidates = new Set();
+      // Quét ô hiện tại + 8 ô lân cận (phòng khi thửa lớn tràn qua nhiều ô lưới,
+      // hoặc điểm chạm rơi sát biên 1 ô).
+      for (let di = -1; di <= 1; di++) {
+        for (let dj = -1; dj <= 1; dj++) {
+          const arr = spatialGrid.get(cellKeyOf(i + di, j + dj));
+          if (arr) for (let k = 0; k < arr.length; k++) candidates.add(arr[k]);
+        }
+      }
+      for (const p of candidates) {
+        if (!p._onMap || !p._poly || p._minLat == null) continue;
+        if (lat < p._minLat || lat > p._maxLat || lon < p._minLon || lon > p._maxLon) continue;
+        if (!p.rings || !p.rings.length) continue;
+        if (!pointInRing(lat, lon, p.rings[0])) continue; // phải trong viền ngoài
+        let inHole = false;
+        for (let r = 1; r < p.rings.length; r++) {
+          if (pointInRing(lat, lon, p.rings[r])) { inHole = true; break; } // trừ lỗ (suối...)
+        }
+        if (!inHole) return p;
+      }
+      return null;
     }
 
     // Xây lưới + tính sẵn bbox và chuỗi thường-không-dấu-hoa (cache) cho tìm kiếm,
@@ -2648,11 +3034,7 @@
         interactive: true, bubblingMouseEvents: false
       });
       poly.on('click tap', e => {
-        // Đánh dấu sự kiện gốc đã được xử lý bởi thửa (poly/dot), để map.on('click')
-        // (bên dưới) KHÔNG đóng popup ngay sau khi vừa mở - đây là nguyên nhân
-        // chính khiến một số điện thoại bị "không tap được vào thửa": popup mở
-        // ra rồi bị đóng lại gần như tức thì trong cùng 1 thao tác chạm.
-        if (e && e.originalEvent) e.originalEvent._handled = true;
+        lastParcelClickAt = Date.now();
         openPopup(p);
       });
 
@@ -2663,7 +3045,7 @@
         interactive: true, bubblingMouseEvents: false
       });
       dot.on('click tap', e => {
-        if (e && e.originalEvent) e.originalEvent._handled = true;
+        lastParcelClickAt = Date.now();
         openPopup(p);
       });
 
@@ -2693,6 +3075,15 @@
       p._lru = ++lruCounter; // đánh dấu "vừa dùng" để LRU không huỷ nhầm thửa đang cần
       if (!p._onMap) {
         p._poly.addTo(map);
+        // QUAN TRỌNG: ép Canvas renderer TÍNH LẠI vùng toạ độ pixel dùng để nhận
+        // diện chạm (hit-test) cho polygon này NGAY khi vừa thêm lại vào bản đồ.
+        // Đã xác nhận qua chẩn đoán thực tế trên điện thoại: có trường hợp thửa
+        // sau khi bị gỡ khỏi bản đồ (do cuộn ra ngoài khung nhìn) rồi được thêm
+        // lại (cuộn trở về) - Canvas renderer vẫn VẼ đúng vị trí (nên mắt nhìn
+        // thấy bình thường), nhưng vùng nhận diện chạm bên trong bị lệch/dùng dữ
+        // liệu cũ, khiến chạm đúng giữa thửa vẫn không bắt được sự kiện click.
+        // .redraw() buộc Leaflet tính lại toàn bộ từ đầu, khắc phục triệt để.
+        p._poly.redraw();
         p._onMap = true;
         renderedSet.add(p);
       }
@@ -2775,8 +3166,20 @@
     const VIEW_ADD_PAD = 0.6;
     const VIEW_REMOVE_PAD = 1.4;
     let viewSyncTimer = null;
+    // Đếm "thế hệ" mỗi lần đồng bộ khung nhìn: khi khung nhìn đổi RẤT NHANH liên
+    // tiếp (vd: bay tới vị trí GPS xong tắt định vị rồi kéo tay ngay), 1 lượt
+    // syncViewportLayers() TRƯỚC có thể còn đang xử lý DỞ (danh sách thửa cần
+    // thêm quá lớn, chia làm nhiều lô trải qua nhiều khung hình rảnh) đúng lúc 1
+    // lượt MỚI HƠN được gọi - nếu không kiểm soát, lượt cũ vẫn tiếp tục âm thầm
+    // thêm/tính theo khung nhìn ĐÃ CŨ, có thể can thiệp sai vào kết quả của lượt
+    // mới (vd tự ý gỡ nhầm 1 thửa lượt mới vừa thêm nếu thửa đó nằm ngoài vùng
+    // đệm-gỡ theo bounds CŨ). syncGeneration đảm bảo MỖI LẦN GỌI chỉ có ĐÚNG 1
+    // lượt (mới nhất) được phép chạy tới cùng; lượt nào bị "vượt mặt" bởi 1 lượt
+    // mới hơn sẽ tự dừng ngay ở lô kế tiếp thay vì tiếp tục xử lý theo dữ liệu cũ.
+    let syncGeneration = 0;
 
     function syncViewportLayers(onProgress) {
+      const myGen = ++syncGeneration;
       return new Promise(resolveSync => {
         if (!allParcels.length) { resolveSync(); return; }
         const b = map.getBounds();
@@ -2828,6 +3231,10 @@
         let k = 0;
         const HARD_CAP_PER_CHUNK = 2000; // chặn an toàn, phòng khi deadline báo sai
         function step(deadline) {
+          // Đã có 1 lượt đồng bộ MỚI HƠN gọi sau lượt này (xem giải thích ở khai
+          // báo syncGeneration) -> dừng ngay, không xử lý tiếp theo dữ liệu/khung
+          // nhìn đã cũ của lượt này nữa; lượt mới hơn sẽ tự lo phần của nó.
+          if (myGen !== syncGeneration) { resolveSync(); return; }
           const hasDeadline = deadline && typeof deadline.timeRemaining === 'function';
           let doneInChunk = 0;
           while (k < toAdd.length) {
@@ -3027,7 +3434,33 @@
     }
 
     map.on('click', e => {
-      if (!e.originalEvent._handled) closePopup();
+      // ── LƯỚI AN TOÀN: tự mở thông tin thửa nếu xác định chắc chắn chạm trúng ────
+      // Đôi khi Leaflet Canvas không tự bắt được sự kiện click lên đúng polygon
+      // (đã xác nhận qua kiểm chứng thực tế: có trường hợp thửa thật sự đang trên
+      // bản đồ và điểm chạm nằm đúng trong ranh, nhưng Leaflet vẫn bỏ lỡ - nguyên
+      // nhân sâu bên trong cơ chế hit-test của Canvas renderer). Để đảm bảo chọn
+      // thửa luôn hoạt động đáng tin cậy bất kể nguyên nhân nội bộ đó là gì, tự
+      // dùng phép toán hình học của chính ta (findParcelAtPoint - đã tính đúng cả
+      // phần lỗ/suối bị khoét trong ranh) làm nguồn xác định dự phòng. Chỉ chạy
+      // khi KHÔNG có 1 click hợp lệ (poly/dot) nào vừa xảy ra gần đây (< 250ms) -
+      // tránh mở lại 1 popup Leaflet vừa tự mở đúng rồi (trường hợp bình thường).
+      if (Date.now() - lastParcelClickAt > 250) {
+        const fallbackMatch = findParcelAtPoint(e.latlng.lat, e.latlng.lng);
+        if (fallbackMatch) {
+          lastParcelClickAt = Date.now();
+          openPopup(fallbackMatch);
+          hideSuggestions();
+          return;
+        }
+      }
+
+      // Chỉ đóng popup nếu cú click này KHÔNG phải cú vừa chọn 1 thửa (xem lastParcelClickAt
+      // ở createParcelLayers) - tránh trường hợp thửa vừa mở popup xong bị map.on('click')
+      // đóng lại ngay trong cùng 1 thao tác chạm (đặc biệt trên di động). Nới từ 60ms
+      // lên 250ms: trên một số điện thoại cũ/khi máy đang bận vẽ nhiều thửa, khoảng
+      // cách giữa 2 sự kiện (click trên thửa rồi tới click trên map) có thể lớn hơn
+      // 60ms, khiến popup vừa mở xong bị đóng lại ngay lập tức (như "không hoạt động").
+      if (Date.now() - lastParcelClickAt > 250) closePopup();
       hideSuggestions();
     });
 
@@ -3603,6 +4036,7 @@
       FileProgress.set(parseEnd);
 
       allParcels = result.parcels;
+      currentLoadedFileName = fileName || '';
       // Link HSQ Tổng của xã đọc được từ chính file vừa mở (nếu QGIS script TDMAP đã gắn sẵn) —
       // reset về '' mỗi lần mở file mới để không giữ lại link của file trước đó.
       currentFileHsqXaLink = result.hsqXaLink || '';
@@ -4421,6 +4855,233 @@
 
       return { start, set, setLabel, creepTo, stopCreep, finish, fail };
     })();
+
+    // ── EXCEL: CẬP NHẬT TÊN CHỦ / XÓA THỬA THEO DANH SÁCH ───────────────────────────
+    // Modal cho phép: (1) đọc 1 file Excel danh sách Tờ-Thửa, hiển thị lên bảng xem
+    // trước, đối chiếu với các thửa đang có trên bản đồ (allParcels); (2) cập nhật
+    // Tên chủ hoặc xóa các thửa khớp Tờ-Thửa NGAY trên bản đồ đang mở (chỉ tác động
+    // dữ liệu trong phiên làm việc hiện tại, không đụng tới file gốc trên Drive/máy);
+    // (3) tải xuống 1 file .geojson mới phản ánh đúng dữ liệu đã cập nhật/xóa, để
+    // dùng thay thế file gốc nếu cần lưu lại kết quả.
+    function openExcelModal() {
+      document.getElementById('excelActionLog').textContent = '';
+      document.getElementById('excelModalOverlay').classList.add('show');
+    }
+    function closeExcelModal() {
+      document.getElementById('excelModalOverlay').classList.remove('show');
+    }
+    function logExcelAction(msg) {
+      document.getElementById('excelActionLog').textContent = msg;
+    }
+
+    // Đọc file Excel đã chọn (SheetJS), lấy sheet đầu tiên, dòng đầu tiên làm tiêu
+    // đề cột. Không tự đoán cột Tờ/Thửa/Tên chủ — luôn để người dùng tự chọn qua
+    // dropdown, tránh gán nhầm cột khi tên cột trong Excel không theo mẫu chuẩn.
+    async function handleExcelFile(file) {
+      if (!file) return;
+      logExcelAction('');
+      document.getElementById('excelColumnsWrap').style.display = 'none';
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
+        if (!rows.length) {
+          showAlert('File Excel không có dữ liệu (hoặc thiếu dòng tiêu đề cột ở dòng đầu tiên).');
+          return;
+        }
+        excelHeaders = Object.keys(rows[0]);
+        excelRows = rows;
+
+        const fillSelect = (id) => {
+          const sel = document.getElementById(id);
+          sel.innerHTML = '<option value="">-- Chọn cột --</option>' +
+            excelHeaders.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join('');
+        };
+        fillSelect('excelColTo');
+        fillSelect('excelColThua');
+        fillSelect('excelColTenChu');
+
+        document.getElementById('excelColumnsWrap').style.display = 'block';
+        onExcelColumnsChange();
+      } catch (e) {
+        showAlert(`Không đọc được file Excel này. Vui lòng kiểm tra đây là file .xlsx/.xls hợp lệ.\n\nChi tiết lỗi: ${e.message}`);
+      }
+    }
+
+    // Xây lại excelMatchList mỗi khi người dùng đổi cột Tờ/Thửa/Tên chủ, đối chiếu
+    // luôn với allParcels hiện tại để hiển thị trạng thái "Có/Không" trong bảng xem trước.
+    function onExcelColumnsChange() {
+      const colTo = document.getElementById('excelColTo').value;
+      const colThua = document.getElementById('excelColThua').value;
+      const colTenChu = document.getElementById('excelColTenChu').value;
+      const summaryEl = document.getElementById('excelPreviewSummary');
+      const tableWrapEl = document.getElementById('excelPreviewTableWrap');
+
+      if (!colTo || !colThua) {
+        excelMatchList = [];
+        summaryEl.textContent = 'Vui lòng chọn cột Tờ và cột Thửa để xem trước danh sách.';
+        tableWrapEl.innerHTML = '';
+        return;
+      }
+
+      const parcelsById = new Map(allParcels.map(p => [p.id, p]));
+      const seen = new Set();
+      excelMatchList = [];
+      excelRows.forEach(r => {
+        const to = String(r[colTo] ?? '').trim();
+        const thua = String(r[colThua] ?? '').trim();
+        if (!to || !thua) return;
+        const key = `${to}-${thua}`;
+        if (seen.has(key)) return; // bỏ dòng trùng Tờ-Thửa (nếu Excel có lặp)
+        seen.add(key);
+        const tenChu = colTenChu ? String(r[colTenChu] ?? '').trim() : '';
+        excelMatchList.push({ key, to, thua, tenChu, found: parcelsById.has(key) });
+      });
+
+      const foundCount = excelMatchList.filter(x => x.found).length;
+      summaryEl.textContent = allParcels.length
+        ? `Đã đọc ${excelMatchList.length} thửa từ Excel · ${foundCount} thửa có trong bản đồ đang mở · ${excelMatchList.length - foundCount} thửa không tìm thấy.`
+        : `Đã đọc ${excelMatchList.length} thửa từ Excel · chưa có file bản đồ (.geojson) nào đang mở để đối chiếu.`;
+
+      const MAX_PREVIEW_ROWS = 500;
+      const rowsHtml = excelMatchList.slice(0, MAX_PREVIEW_ROWS).map(x => `
+        <tr>
+          <td style="padding:4px 8px;border-bottom:1px solid #f2f2f2;white-space:nowrap;">${escapeHtml(x.key)}</td>
+          <td style="padding:4px 8px;border-bottom:1px solid #f2f2f2;">${escapeHtml(x.tenChu)}</td>
+          <td style="padding:4px 8px;border-bottom:1px solid #f2f2f2;font-weight:700;white-space:nowrap;color:${x.found ? '#0a9d5b' : '#d9534f'};">${x.found ? 'Có trong bản đồ' : 'Không tìm thấy'}</td>
+        </tr>`).join('');
+      const moreNote = excelMatchList.length > MAX_PREVIEW_ROWS
+        ? `<div style="padding:6px 8px;color:#888;font-size:11.5px;">… còn ${excelMatchList.length - MAX_PREVIEW_ROWS} dòng nữa (ẩn bớt để bảng không bị chậm, các thao tác bên dưới vẫn áp dụng cho toàn bộ danh sách).</div>`
+        : '';
+      tableWrapEl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+        <tr style="background:#f8f9fa;position:sticky;top:0;">
+          <th style="text-align:left;padding:4px 8px;">Tờ-Thửa</th>
+          <th style="text-align:left;padding:4px 8px;">Tên chủ (Excel)</th>
+          <th style="text-align:left;padding:4px 8px;">Trạng thái</th>
+        </tr>
+        ${rowsHtml}
+      </table>${moreNote}`;
+    }
+
+    // Gỡ + huỷ layer Leaflet đã tạo cho 1 thửa (nếu có) rồi tạo lại nếu thửa đó
+    // đang hiển thị trên bản đồ — dùng sau khi đổi Tên chủ để màu/nhãn được vẽ lại
+    // đúng dữ liệu mới ngay lập tức, không cần tải lại trang.
+    function refreshParcelVisual(p) {
+      const wasOnMap = !!p._onMap;
+      if (p._poly) { removeParcelFromMap(p); destroyParcelLayers(p); }
+      if (wasOnMap) ensureParcelOnMap(p);
+      if (activeP === p) openPopup(p);
+    }
+
+    function applyExcelUpdateOwner() {
+      const colTenChu = document.getElementById('excelColTenChu').value;
+      if (!colTenChu) { showAlert('Vui lòng chọn cột Tên chủ trước khi cập nhật.'); return; }
+      if (!allParcels.length) { showAlert('Chưa có file bản đồ (.geojson) nào đang mở để cập nhật.'); return; }
+      if (!excelMatchList.length) { showAlert('Không có dữ liệu hợp lệ từ Excel (thiếu cột Tờ hoặc Thửa).'); return; }
+
+      const toUpdate = excelMatchList.filter(x => x.found);
+      if (!toUpdate.length) {
+        logExcelAction('Không có thửa nào trong Excel khớp với file bản đồ đang mở.');
+        return;
+      }
+      if (!confirm(`Cập nhật Tên chủ cho ${toUpdate.length} thửa trên bản đồ đang mở theo danh sách Excel?`)) return;
+
+      const parcelsById = new Map(allParcels.map(p => [p.id, p]));
+      let updated = 0;
+      toUpdate.forEach(x => {
+        const p = parcelsById.get(x.key);
+        if (!p) return;
+        p.tenChu = x.tenChu;
+        p._tenChuLower = (p.tenChu || '').toLowerCase();
+        refreshParcelVisual(p);
+        updated++;
+      });
+
+      updateMapStats();
+      logExcelAction(`✓ Đã cập nhật Tên chủ cho ${updated}/${toUpdate.length} thửa khớp Excel.\n${excelMatchList.length - toUpdate.length} thửa trong Excel không có trong file đang mở.\nDùng nút "Tải file GeoJSON đã cập nhật" bên dưới nếu muốn lưu lại kết quả.`);
+      showStatus(`✓ Đã cập nhật tên chủ cho ${updated} thửa từ Excel`);
+    }
+
+    function applyExcelDeleteParcels() {
+      if (!allParcels.length) { showAlert('Chưa có file bản đồ (.geojson) nào đang mở để xóa.'); return; }
+      if (!excelMatchList.length) { showAlert('Không có dữ liệu hợp lệ từ Excel (thiếu cột Tờ hoặc Thửa).'); return; }
+
+      const toDelete = excelMatchList.filter(x => x.found);
+      if (!toDelete.length) {
+        logExcelAction('Không có thửa nào trong Excel khớp với file bản đồ đang mở để xóa.');
+        return;
+      }
+      if (!confirm(`XÓA ${toDelete.length} thửa khỏi bản đồ đang mở theo danh sách Excel?\nThao tác này chỉ áp dụng cho phiên làm việc hiện tại và không thể hoàn tác (trừ khi mở lại file gốc).`)) return;
+
+      const deleteKeys = new Set(toDelete.map(x => x.key));
+      const removedParcels = allParcels.filter(p => deleteKeys.has(p.id));
+      removedParcels.forEach(p => {
+        if (activeP === p) closePopup();
+        if (p._poly) { removeParcelFromMap(p); destroyParcelLayers(p); }
+      });
+      allParcels = allParcels.filter(p => !deleteKeys.has(p.id));
+      // Lưới chỉ mục không gian (spatialGrid) vẫn giữ tham chiếu tới các thửa cũ —
+      // phải xây lại, nếu không các thửa vừa xóa sẽ hiện lại khi pan/zoom bản đồ.
+      buildSpatialIndex(allParcels);
+
+      updateMapStats();
+      logExcelAction(`✓ Đã xóa ${removedParcels.length}/${toDelete.length} thửa khỏi bản đồ đang mở.\n${excelMatchList.length - toDelete.length} thửa trong Excel không có trong file đang mở.\nDùng nút "Tải file GeoJSON đã cập nhật" bên dưới nếu muốn lưu lại kết quả.`);
+      showStatus(`✓ Đã xóa ${removedParcels.length} thửa khỏi bản đồ`);
+      onExcelColumnsChange(); // cập nhật lại cột "Trạng thái" trong bảng xem trước
+    }
+
+    // Dựng lại 1 FeatureCollection GeoJSON từ allParcels hiện tại (đã áp dụng mọi
+    // thay đổi tên chủ/xóa thửa trong phiên) để tải xuống. Cấu trúc thuộc tính
+    // (khoa/dienTich/loaiDat/tenChu/trangThaiDK/label) tương thích ngược với chính
+    // hàm parseGeoJSON của TDMAP — mở lại file này trong TDMAP sẽ ra đúng dữ liệu hiện tại.
+    function buildGeoJSONFromParcels(parcels) {
+      const features = [];
+      parcels.forEach(p => {
+        let label = `${p.id}-${p.dienTich || ''}-${p.loaiDat || ''}`;
+        if (p.tenChu) label += `-${p.tenChu}`;
+        if (p.trangThaiDK) label += `-${p.trangThaiDK}`;
+        const baseProps = {
+          khoa: p.id, dienTich: p.dienTich || '', loaiDat: p.loaiDat || '',
+          tenChu: p.tenChu || '', trangThaiDK: p.trangThaiDK || '', label
+        };
+        if (p.rings && p.rings.length) {
+          features.push({
+            type: 'Feature',
+            properties: { ...baseProps },
+            geometry: {
+              type: 'Polygon',
+              coordinates: p.rings.map(ring => ring.map(([lat, lon]) => [lon, lat]))
+            }
+          });
+        }
+        if (p.lat != null && p.lon != null) {
+          features.push({
+            type: 'Feature',
+            properties: { ...baseProps, linkHSQ: p.linkHSQ || '', chiDuong: p.chiDuong || '' },
+            geometry: { type: 'Point', coordinates: [p.lon, p.lat] }
+          });
+        }
+      });
+      return { type: 'FeatureCollection', features };
+    }
+
+    function downloadUpdatedGeoJSON() {
+      if (!allParcels.length) { showAlert('Chưa có dữ liệu bản đồ để xuất file.'); return; }
+      const fc = buildGeoJSONFromParcels(allParcels);
+      const blob = new Blob([JSON.stringify(fc)], { type: 'application/geo+json' });
+      const url = URL.createObjectURL(blob);
+      const baseName = (currentLoadedFileName || 'tdmap').replace(/\.(geojson|json|kml)$/i, '');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${baseName}_capnhat.geojson`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      showStatus('✓ Đã tải file GeoJSON đã cập nhật');
+    }
 
     // ── STATUS ────────────────────────────────────────────────────────────────────
     let sTimer;
