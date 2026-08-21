@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TDMAP.PRO.VN-210826</title>
+  <title>TDMAP.PRO.VN-210826v1</title>
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server  -->
@@ -1019,6 +1019,80 @@
       opacity: .6;
     }
 
+    #driveLoginBtn {
+      margin-top: 10px;
+      width: 100%;
+      border: none;
+      border-radius: 8px;
+      background: #1a6fd4;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    #driveLoginBtn:active {
+      filter: brightness(.85);
+    }
+
+    #driveLoginBtn:disabled {
+      opacity: .6;
+    }
+
+    #driveLoggedInBox {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 6px;
+      padding: 8px 10px;
+      background: rgba(0, 198, 167, 0.1);
+      border: 1px solid rgba(0, 198, 167, 0.35);
+      border-radius: 8px;
+      font-size: 12.5px;
+      color: #06231d;
+    }
+
+    #driveLoggedInBox button {
+      border: none;
+      background: transparent;
+      color: #d9534f;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    #googleSignInBtn {
+      margin: 2px 0 6px;
+      min-height: 40px;
+    }
+
+    #googleSignedEmailBox {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 2px 0 6px;
+      padding: 8px 10px;
+      background: rgba(26, 111, 212, 0.08);
+      border: 1px solid rgba(26, 111, 212, 0.3);
+      border-radius: 8px;
+      font-size: 12.5px;
+      color: #0d3d75;
+    }
+
+    #googleSignedEmailBox button {
+      border: none;
+      background: transparent;
+      color: #1a6fd4;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
     #driveStatusMsg {
       font-size: 12.5px;
       color: #888;
@@ -1743,22 +1817,47 @@
           </div>
         </div>
 
-        <div style="display:flex; gap:10px;">
-          <div style="flex:0.8;">
-            <div class="drive-field-label"><span>Mã xã</span></div>
-            <input class="drive-input" id="driveCommuneCodeInput" type="text" placeholder="Mã xã" readonly>
-          </div>
-          <div style="flex:1.2;">
-            <div class="drive-field-label"><span>Google API Key</span></div>
-            <input class="drive-input" id="driveApiKeyInput" type="text" placeholder="Tdmap + mã xã (VD: Tdmap24301)"
-              oninput="onApiKeyInput()">
-          </div>
+        <div>
+          <div class="drive-field-label"><span>Mã xã</span></div>
+          <input class="drive-input" id="driveCommuneCodeInput" type="text" placeholder="Mã xã" readonly>
         </div>
 
         <div style="display:none;">
-          <div class="drive-field-label"><span>Link thư mục Google Drive</span></div>
-          <input class="drive-input" id="driveFolderInput" type="text"
-            placeholder="https://drive.google.com/drive/folders/...">
+          <input class="drive-input" id="driveApiKeyInput" type="text">
+          <input class="drive-input" id="driveFolderInput" type="text">
+        </div>
+
+        <div id="driveLoginFields">
+          <div style="display:flex; gap:10px;">
+            <div style="flex:1;">
+              <div class="drive-field-label"><span>Tên đăng nhập</span></div>
+              <input class="drive-input" id="driveUsernameInput" type="text" placeholder="Tên đăng nhập"
+                autocomplete="username" oninput="updateDriveLoginBtnState()"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('drivePasswordInput').focus();}">
+            </div>
+            <div style="flex:1;">
+              <div class="drive-field-label"><span>Mật khẩu</span></div>
+              <input class="drive-input" id="drivePasswordInput" type="password" placeholder="Mật khẩu"
+                autocomplete="current-password" oninput="updateDriveLoginBtnState()"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();driveLogin();}">
+            </div>
+          </div>
+
+          <div class="drive-field-label"><span>Email đăng nhập (chọn tài khoản Google trên máy)</span></div>
+          <div id="googleSignInBtn"></div>
+          <input class="drive-input" id="driveManualEmailInput" type="email" placeholder="Email của bạn"
+            style="display:none;" oninput="updateDriveLoginBtnState()">
+          <div id="googleSignedEmailBox" style="display:none;">
+            <span>✓ <b id="googleSignedEmailText"></b></span>
+            <button type="button" onclick="clearGoogleSignIn()">Đổi</button>
+          </div>
+
+          <button id="driveLoginBtn" disabled onclick="driveLogin()">🔐 Đăng nhập</button>
+        </div>
+
+        <div id="driveLoggedInBox" style="display:none;">
+          <span>✓ Đã đăng nhập: <b id="driveLoggedName"></b></span>
+          <button type="button" onclick="driveLogout()">Đăng xuất</button>
         </div>
 
         <label class="drive-remember-row">
@@ -1847,10 +1946,60 @@
         }
         __dvhcScriptState = 'loading';
         const s = document.createElement('script');
-        s.src = 'dvhc2025.js';
+        // Ghép đường dẫn tương đối "dvhc2025.js" với document.baseURI (URL thật
+        // của chính file index2108.html đang chạy) thay vì để trình duyệt tự suy
+        // ra - đảm bảo LUÔN lấy đúng file dvhc2025.js nằm CÙNG THƯ MỤC với file
+        // HTML đang mở (kể cả khi test cục bộ trên máy bằng cách mở trực tiếp
+        // file, hay khi chạy qua 1 server nội bộ có đường dẫn lồng nhau).
+        s.src = new URL('dvhc2025.js', document.baseURI).href;
         s.onload = () => { __dvhcScriptState = 'ready'; document.dispatchEvent(new Event('dvhc-ready')); resolve(); };
-        s.onerror = () => { __dvhcScriptState = 'idle'; resolve(); };
+        s.onerror = () => {
+          __dvhcScriptState = 'idle';
+          console.error('Không tải được dvhc2025.js tại: ' + s.src + ' — hãy kiểm tra file này có nằm cùng thư mục với file HTML đang chạy không.');
+          if (typeof setDriveStatus === 'function') {
+            setDriveStatus('Không tải được dữ liệu Tỉnh/Xã (dvhc2025.js). Hãy đảm bảo file dvhc2025.js nằm cùng thư mục với file HTML đang chạy.', true);
+          }
+          resolve();
+        };
         document.head.appendChild(s);
+      });
+    }
+  </script>
+  <!-- Google Identity Services: dùng để hiện sẵn danh sách tài khoản Google đang
+       đăng nhập trên máy/điện thoại cho người dùng CHỌN email đăng nhập (được
+       Google xác thực thật, không phải tự gõ tay) khi đăng nhập tài khoản Xã ở
+       khung "Mở file .geojson từ Google Drive". Tải "lazy" giống dvhc2025.js -
+       chỉ tải khi mở khung Drive lần đầu, không chặn hiển thị bản đồ. Nếu tải
+       lỗi (mất mạng, bị chặn...) tự chuyển sang ô nhập email tay dự phòng -
+       xem setupGoogleEmailPicker() ở phần code đăng nhập Drive phía dưới. -->
+  <script>
+    let __gsiScriptState = 'idle'; // idle | loading | ready | failed
+    function ensureGsiScriptLoaded() {
+      return new Promise((resolve) => {
+        if (__gsiScriptState === 'ready') { resolve(true); return; }
+        if (__gsiScriptState === 'failed') { resolve(false); return; }
+        if (__gsiScriptState === 'loading') {
+          document.addEventListener('gsi-ready', () => resolve(true), { once: true });
+          document.addEventListener('gsi-failed', () => resolve(false), { once: true });
+          return;
+        }
+        __gsiScriptState = 'loading';
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.async = true;
+        s.defer = true;
+        s.onload = () => { __gsiScriptState = 'ready'; document.dispatchEvent(new Event('gsi-ready')); resolve(true); };
+        s.onerror = () => { __gsiScriptState = 'failed'; document.dispatchEvent(new Event('gsi-failed')); resolve(false); };
+        document.head.appendChild(s);
+        // Phòng trường hợp script "treo" (tải rất chậm nhưng chưa hẳn lỗi hẳn) -
+        // sau 4s vẫn chưa xong thì coi như lỗi, chuyển sang ô nhập email tay.
+        setTimeout(() => {
+          if (__gsiScriptState === 'loading') {
+            __gsiScriptState = 'failed';
+            document.dispatchEvent(new Event('gsi-failed'));
+            resolve(false);
+          }
+        }, 4000);
       });
     }
   </script>
@@ -2018,6 +2167,10 @@
     // ── LINK HSQ CHUNG CỦA XÃ (độc lập với danh sách thửa trong file KML/GeoJSON) ─
     const HSQ_XA_KEY = 'tdmap_hsq_xa_link_v1';
     let pendingHsqUrl = null;
+    // Hồ sơ HSQ của thửa ĐANG CHỜ MỞ SAU KHI ĐĂNG NHẬP (thửa đã đăng ký (DDK) bị
+    // chặn cho tới khi đăng nhập tài khoản xã - xem openParcelHsqWithGuide() và
+    // driveLogin() bên dưới) - { url, parcelId } hoặc null nếu không có gì đang chờ.
+    let pendingHsqAfterLogin = null;
     // Link HSQ Tổng của xã ĐỌC ĐƯỢC TỪ FILE đang mở (nếu QGIS script TDMAP đã gắn sẵn) —
     // được ưu tiên dùng trước link đã lưu thủ công trong localStorage.
     let currentFileHsqXaLink = '';
@@ -2127,6 +2280,19 @@
     function openParcelHsqWithGuide(url) {
       if (!url || url === '#' || url.endsWith('#')) return;
       const parcelId = activeP ? activeP.id : null;
+
+      // Thửa ĐÃ ĐĂNG KÝ (DDK) đã có hồ sơ thật (CCCD, giấy chứng nhận...) trong
+      // thư mục HSQ -> bắt buộc đăng nhập tài khoản của xã (dùng chung khung
+      // đăng nhập ở "Mở file .geojson từ Google Drive") trước khi cho mở, để
+      // tránh lộ thông tin cá nhân cho người không có quyền. Thửa CHƯA đăng ký
+      // thì không cần (thư mục thường trống/chưa có giấy tờ nhạy cảm).
+      if (activeP && activeP.trangThaiDK === 'DDK' && !driveLoggedIn) {
+        pendingHsqAfterLogin = { url, parcelId };
+        showAlert('Thửa này đã đăng ký (DDK) — cần đăng nhập tài khoản của xã trước khi xem hồ sơ HSQ.\n\nVui lòng đăng nhập ở khung vừa mở, hồ sơ sẽ tự mở lại sau khi đăng nhập thành công.');
+        openDriveModal();
+        return;
+      }
+
       showHsqGuide(url, parcelId, false);
     }
 
@@ -4322,6 +4488,90 @@
     const GDRIVE_DEFAULT_APIKEY = 'Tdmap';
     const GDRIVE_DEFAULT_FOLDER = '';
 
+    // ── ĐĂNG NHẬP THEO XÃ (xác thực Tên đăng nhập/Mật khẩu qua Google Apps Script,
+    //    ghi lịch sử đăng nhập vào Google Sheet) ─────────────────────────────────
+    // URL Web App của Google Apps Script (Deploy > New deployment > Web app,
+    // "Execute as: Me", "Who has access: Anyone"), lấy URL kết thúc bằng "/exec".
+    // Xem code mẫu + hướng dẫn triển khai trong file AppsScript_DangNhap.gs.txt
+    // (cùng thư mục dự án) - script đó đọc/ghi trực tiếp Google Sheet quản lý
+    // tài khoản theo xã: https://docs.google.com/spreadsheets/d/1gBwgYF9gjEGERPyVwRiJfnEinSGQA1nomoenqNtFLjQ/edit
+    const DRIVE_AUTH_API_URL = 'https://script.google.com/macros/s/AKfycbyqQJAM2p4huTOMLUK_EC4i_gwLsgkteAxP5vNkln0bCS2SeouJ8NsXRnmIPTtz88iQ/exec';
+    let driveLoggedIn = false;
+    let driveLoggedName = '';
+
+    // ── EMAIL ĐĂNG NHẬP: GỢI Ý TÀI KHOẢN GOOGLE ĐANG ĐĂNG NHẬP TRÊN MÁY ──────────
+    // Client ID lấy từ Google Cloud Console (xem GOOGLE_CLIENT_ID_WEB-TDMAP.txt
+    // trong thư mục dự án) - PHẢI được thêm đúng domain đang chạy web này vào mục
+    // "Authorized JavaScript origins" của Client ID đó trên Cloud Console thì nút
+    // chọn tài khoản Google mới hoạt động (không thêm được thì tự chuyển sang ô
+    // nhập email tay, xem showManualEmailFallback()).
+    const GOOGLE_CLIENT_ID = '568799386764-gin8nn93so7v4f7m8s9cj00jc3303qq1.apps.googleusercontent.com';
+    let googleIdToken = null; // JWT do Google cấp sau khi chọn tài khoản - gửi lên Apps Script để XÁC THỰC thật (không tin trực tiếp email phía trình duyệt)
+    let googleSignedEmail = '';
+
+    // Chuẩn bị lại khu vực chọn email mỗi lần mở khung Drive (không giữ lựa chọn cũ giữa các lần).
+    async function setupGoogleEmailPicker() {
+      googleIdToken = null;
+      googleSignedEmail = '';
+      document.getElementById('googleSignedEmailBox').style.display = 'none';
+      const manual = document.getElementById('driveManualEmailInput');
+      manual.style.display = 'none';
+      manual.value = '';
+      const btnEl = document.getElementById('googleSignInBtn');
+      btnEl.style.display = '';
+      btnEl.innerHTML = '';
+      updateDriveLoginBtnState();
+
+      const loaded = await ensureGsiScriptLoaded();
+      if (!loaded || !window.google || !google.accounts || !google.accounts.id) {
+        showManualEmailFallback();
+        return;
+      }
+      try {
+        google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredentialResponse, auto_select: false });
+        google.accounts.id.renderButton(btnEl, { theme: 'outline', size: 'large', text: 'signin_with', width: 260 });
+      } catch (e) {
+        showManualEmailFallback();
+      }
+    }
+
+    // Không tải/hiện được nút chọn tài khoản Google (mất mạng, bị chặn, domain
+    // chưa được cấp phép...) -> vẫn cho tiếp tục đăng nhập bằng cách tự gõ email.
+    function showManualEmailFallback() {
+      document.getElementById('googleSignInBtn').style.display = 'none';
+      document.getElementById('driveManualEmailInput').style.display = '';
+      setDriveStatus('Không lấy được danh sách tài khoản Google trên máy — vui lòng tự nhập email của bạn.', true);
+    }
+
+    function handleGoogleCredentialResponse(response) {
+      googleIdToken = response.credential;
+      googleSignedEmail = decodeJwtEmail(response.credential);
+      document.getElementById('googleSignedEmailText').textContent = googleSignedEmail || '(đã chọn tài khoản)';
+      document.getElementById('googleSignedEmailBox').style.display = 'flex';
+      document.getElementById('googleSignInBtn').style.display = 'none';
+      updateDriveLoginBtnState();
+    }
+
+    // Chỉ dùng để HIỂN THỊ ngay trên trình duyệt cho người dùng thấy email vừa
+    // chọn - không phải bước xác thực thật. Apps Script sẽ tự giải mã + xác
+    // thực lại chữ ký JWT này với Google (tokeninfo) trước khi ghi vào lịch sử.
+    function decodeJwtEmail(jwt) {
+      try {
+        const payload = jwt.split('.')[1];
+        const b64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const json = decodeURIComponent(atob(b64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+        return JSON.parse(json).email || '';
+      } catch (e) { return ''; }
+    }
+
+    function clearGoogleSignIn() {
+      googleIdToken = null;
+      googleSignedEmail = '';
+      document.getElementById('googleSignedEmailBox').style.display = 'none';
+      document.getElementById('googleSignInBtn').style.display = '';
+      updateDriveLoginBtnState();
+    }
+
     function extractDriveFolderId(url) {
       if (!url) return null;
       const s = url.trim();
@@ -4367,24 +4617,40 @@
       }
     }
 
-    // Kiểm tra 3 ô Tỉnh / Xã / Google API Key đã nhập đúng & đủ hay chưa,
-    // rồi bật/tắt nút "Tải danh sách file .geojson" tương ứng (ô Link thư mục
-    // đã được ẩn khỏi giao diện nên nút này giờ tự lo việc dò thư mục ngầm).
+    // Kiểm tra Tỉnh / Xã đã chọn đúng & đã ĐĂNG NHẬP thành công hay chưa, rồi
+    // bật/tắt nút "Tải danh sách file .geojson" tương ứng (ô Link thư mục đã
+    // được ẩn khỏi giao diện nên nút này giờ tự lo việc dò thư mục ngầm; API Key
+    // thật cũng được tự gán ngầm ngay khi đăng nhập thành công - xem driveLogin()).
     function isDriveFormValid() {
       const provName = document.getElementById('driveProvinceInput').value.trim();
       const commName = document.getElementById('driveCommuneInput').value.trim();
       const commCode = document.getElementById('driveCommuneCodeInput').value.trim();
-      const apiKeyRaw = document.getElementById('driveApiKeyInput').value.trim();
       const provOk = !!provName && provincesMap.has(provName);
       const commOk = !!commName && communesMap.has(commName) && !!commCode;
-      const keyOk = !!apiKeyRaw;
-      return provOk && commOk && keyOk;
+      return provOk && commOk && driveLoggedIn;
     }
 
     function updateDriveListBtnState() {
       const btn = document.getElementById('driveListBtn');
       if (!btn) return;
       btn.disabled = !isDriveFormValid();
+    }
+
+    // Kiểm tra Tỉnh / Xã / Tên đăng nhập / Mật khẩu đã nhập đủ chưa, để
+    // bật/tắt nút "Đăng nhập" (chưa xác thực đúng/sai, chỉ kiểm tra đã nhập đủ).
+    function updateDriveLoginBtnState() {
+      const btn = document.getElementById('driveLoginBtn');
+      if (!btn) return;
+      const provOk = provincesMap.has(document.getElementById('driveProvinceInput').value.trim());
+      const commOk = !!document.getElementById('driveCommuneCodeInput').value.trim();
+      const uOk = !!document.getElementById('driveUsernameInput').value.trim();
+      const pOk = !!document.getElementById('drivePasswordInput').value;
+      // Phải có email đăng nhập: hoặc đã chọn tài khoản Google (googleIdToken),
+      // hoặc đang ở chế độ dự phòng thì phải tự gõ email vào ô thay thế.
+      const manualEmail = document.getElementById('driveManualEmailInput');
+      const manualVisible = manualEmail && manualEmail.style.display !== 'none';
+      const emailOk = !!googleIdToken || (manualVisible && !!manualEmail.value.trim());
+      btn.disabled = !(provOk && commOk && uOk && pOk && emailOk);
     }
 
     function onProvinceInput() {
@@ -4409,6 +4675,7 @@
       if (!provCode) {
         commInput.disabled = true;
         updateDriveListBtnState();
+        updateDriveLoginBtnState();
         return;
       }
 
@@ -4424,6 +4691,7 @@
       });
 
       updateDriveListBtnState();
+      updateDriveLoginBtnState();
     }
 
     function onCommuneInput() {
@@ -4434,6 +4702,7 @@
       if (!commCode) {
         codeInput.value = '';
         updateDriveListBtnState();
+        updateDriveLoginBtnState();
         return;
       }
 
@@ -4446,64 +4715,115 @@
       statusEl.textContent = '';
       statusEl.style.display = 'none';
 
-      // Tự động gán "Tdmap" vào ô Google API Key để người dùng chỉ cần gõ tiếp
-      // mã xã phía sau (vd: Tdmap24301), thay vì phải tự gõ lại chữ "Tdmap".
-      const apiKeyInput = document.getElementById('driveApiKeyInput');
-      apiKeyInput.value = 'Tdmap';
-      apiKeyInput.focus();
-      apiKeyInput.setSelectionRange(apiKeyInput.value.length, apiKeyInput.value.length);
+      // Đổi xã khác → phải đăng nhập lại (tài khoản chỉ có quyền với 1 xã).
+      if (driveLoggedIn) driveLogout();
+
+      document.getElementById('driveUsernameInput').focus();
 
       updateDriveListBtnState();
+      updateDriveLoginBtnState();
     }
 
-    // Khi người dùng nhập xong key dạng Tdmap+mã xã (VD: Tdmap24301) → tự tra mã xã
-    // trong dữ liệu ĐVHC, điền tỉnh/xã, rồi quét link thư mục và quét file bản đồ.
-    let apiKeyDebounceTimer = null;
-    function onApiKeyInput() {
-      updateDriveListBtnState();
-      clearTimeout(apiKeyDebounceTimer);
-      apiKeyDebounceTimer = setTimeout(async () => {
-        const apiKeyRaw = document.getElementById('driveApiKeyInput').value.trim();
-        if (!apiKeyRaw) return;
+    // Gửi Tên đăng nhập/Mật khẩu lên Google Apps Script để xác thực đúng tài khoản
+    // VÀ đúng xã đã chọn; script ghi lại lịch sử đăng nhập (thành công lẫn thất
+    // bại) vào Google Sheet. Đăng nhập thành công mới tự dò link thư mục + quét
+    // file bản đồ của xã đó (dùng API Key thật giấu trong resolveGdriveApiKey()).
+    async function driveLogin() {
+      const provName = document.getElementById('driveProvinceInput').value.trim();
+      const commName = document.getElementById('driveCommuneInput').value.trim();
+      const commCode = document.getElementById('driveCommuneCodeInput').value.trim();
+      const username = document.getElementById('driveUsernameInput').value.trim();
+      const password = document.getElementById('drivePasswordInput').value;
 
-        // Kiểm tra key phải bắt đầu bằng Tdmap + ít nhất 1 ký tự mã xã
-        const m = apiKeyRaw.match(/^Tdmap(\d+)$/);
-        if (!m) {
-          // Chưa đúng format → chưa làm gì, chờ người dùng nhập tiếp
+      if (!provName || !provincesMap.has(provName) || !commName || !communesMap.has(commName) || !commCode) {
+        setDriveStatus('Vui lòng chọn đúng Tỉnh/Thành và Xã/Phường trước khi đăng nhập.', true);
+        return;
+      }
+      if (!username || !password) {
+        setDriveStatus('Vui lòng nhập Tên đăng nhập và Mật khẩu.', true);
+        return;
+      }
+      const manualEmailInput = document.getElementById('driveManualEmailInput');
+      const manualEmailVisible = manualEmailInput.style.display !== 'none';
+      const manualEmail = manualEmailVisible ? manualEmailInput.value.trim() : '';
+      if (!googleIdToken && !manualEmail) {
+        setDriveStatus('Vui lòng chọn tài khoản Google (hoặc nhập email) để xác nhận email đăng nhập.', true);
+        return;
+      }
+      if (!DRIVE_AUTH_API_URL || DRIVE_AUTH_API_URL.indexOf('DÁN_URL') !== -1) {
+        setDriveStatus('Chưa cấu hình API đăng nhập (DRIVE_AUTH_API_URL) — xem hướng dẫn trong file AppsScript_DangNhap.gs.txt.', true);
+        return;
+      }
+
+      const btn = document.getElementById('driveLoginBtn');
+      btn.disabled = true;
+      setDriveStatus('Đang kiểm tra tài khoản...');
+
+      try {
+        // Content-Type "text/plain" để trình duyệt KHÔNG gửi preflight OPTIONS
+        // (Google Apps Script Web App không xử lý được preflight CORS).
+        const res = await fetch(DRIVE_AUTH_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'login', username, password, provName, commName, commCode,
+            idToken: googleIdToken || '',
+            manualEmail: manualEmail
+          })
+        });
+        const data = await res.json();
+
+        if (!data || !data.ok) {
+          setDriveStatus((data && data.message) || 'Sai tên đăng nhập hoặc mật khẩu, hoặc tài khoản không có quyền truy cập xã này.', true);
+          btn.disabled = false;
+          updateDriveLoginBtnState();
           return;
         }
 
-        const inputCommCode = m[1]; // mã xã người dùng nhập
-
-        // Tra mã xã trong dữ liệu ĐVHC
-        await loadDvhcData();
-        const dvhcItem = dvhcData.find(item => item["Mã"] === inputCommCode);
-        if (!dvhcItem) {
-          setDriveStatus(`Không tìm thấy mã xã "${inputCommCode}" trong dữ liệu ĐVHC. Vui lòng kiểm tra lại.`, true);
-          return;
-        }
-
-        const commCode = dvhcItem["Mã"];
-        const commName = dvhcItem["Tên"];
-        const provName = dvhcItem["Tỉnh / Thành Phố"];
-
-        // Tự động điền Tỉnh, Xã, Mã xã vào các ô
-        document.getElementById('driveProvinceInput').value = provName;
-        onProvinceInput(); // cập nhật danh sách xã của tỉnh
-        document.getElementById('driveCommuneInput').value = commName;
-        document.getElementById('driveCommuneCodeInput').value = commCode;
+        driveLoggedIn = true;
+        driveLoggedName = data.email || data.hoTen || username;
+        document.getElementById('driveLoggedName').textContent = driveLoggedName;
+        document.getElementById('driveLoginFields').style.display = 'none';
+        document.getElementById('driveLoggedInBox').style.display = 'flex';
+        document.getElementById('drivePasswordInput').value = '';
         updateDriveListBtnState();
 
-        const apiKey = resolveGdriveApiKey(apiKeyRaw);
-        if (!apiKey) {
-          setDriveStatus('Không thể giải mã API Key.', true);
+        // Nếu đăng nhập này là để mở hồ sơ HSQ của 1 thửa đã đăng ký (DDK) đang
+        // chờ (xem openParcelHsqWithGuide()) -> đóng khung Drive, mở lại luôn
+        // hướng dẫn/link HSQ của thửa đó, KHÔNG cần quét toàn bộ file bản đồ.
+        if (pendingHsqAfterLogin) {
+          const pending = pendingHsqAfterLogin;
+          pendingHsqAfterLogin = null;
+          closeDriveModal();
+          showHsqGuide(pending.url, pending.parcelId, false);
           return;
         }
 
-        // Tự động quét tìm link thư mục và quét file bản đồ
-        setDriveStatus(`✓ Key hợp lệ: ${apiKeyRaw} — Đang quét link thư mục và file bản đồ...`);
+        // Tự động dò link thư mục + quét file bản đồ của xã vừa đăng nhập
+        const apiKey = resolveGdriveApiKey('Tdmap' + commCode);
+        document.getElementById('driveApiKeyInput').value = 'Tdmap' + commCode;
+        setDriveStatus(`✓ Đăng nhập thành công (${driveLoggedName}). Đang quét thư mục và file bản đồ...`);
         fetchCommuneFolderLink(apiKey, provName, commName, commCode);
-      }, 800); // debounce 800ms để chờ người dùng gõ xong mã xã
+
+      } catch (e) {
+        setDriveStatus(`Lỗi kết nối API đăng nhập: ${e.message || e}`, true);
+        btn.disabled = false;
+      }
+    }
+
+    function driveLogout() {
+      driveLoggedIn = false;
+      driveLoggedName = '';
+      document.getElementById('driveLoginFields').style.display = '';
+      document.getElementById('driveLoggedInBox').style.display = 'none';
+      document.getElementById('driveUsernameInput').value = '';
+      document.getElementById('drivePasswordInput').value = '';
+      document.getElementById('driveApiKeyInput').value = '';
+      document.getElementById('driveFolderInput').value = '';
+      document.getElementById('driveFileList').innerHTML = '';
+      setDriveStatus('');
+      updateDriveListBtnState();
+      setupGoogleEmailPicker(); // đổi tài khoản -> bắt chọn lại email đăng nhập từ đầu
     }
 
     // Dò tìm ID thư mục Google Drive của Xã (theo cây thư mục Tỉnh > Mã xã),
@@ -4564,14 +4884,22 @@
     }
 
     function openDriveModal() {
-      const keyInput = document.getElementById('driveApiKeyInput');
-      const folderInput = document.getElementById('driveFolderInput');
-      keyInput.value = localStorage.getItem(GDRIVE_KEY_STORAGE) || GDRIVE_DEFAULT_APIKEY;
-      folderInput.value = localStorage.getItem(GDRIVE_FOLDER_STORAGE) || GDRIVE_DEFAULT_FOLDER;
+      // Mỗi lần mở lại khung này đều bắt đăng nhập lại từ đầu (không lưu mật khẩu) -
+      // tránh để lộ dữ liệu xã khác nếu máy dùng chung.
+      driveLoggedIn = false;
+      driveLoggedName = '';
+      document.getElementById('driveApiKeyInput').value = '';
+      document.getElementById('driveFolderInput').value = localStorage.getItem(GDRIVE_FOLDER_STORAGE) || GDRIVE_DEFAULT_FOLDER;
+      document.getElementById('driveUsernameInput').value = '';
+      document.getElementById('drivePasswordInput').value = '';
+      document.getElementById('driveLoginFields').style.display = '';
+      document.getElementById('driveLoggedInBox').style.display = 'none';
       document.getElementById('driveFileList').innerHTML = '';
       setDriveStatus('');
       updateDriveListBtnState();
+      updateDriveLoginBtnState();
       document.getElementById('driveModalOverlay').classList.add('show');
+      setupGoogleEmailPicker();
 
       // Hiện ngay danh sách bản đồ đã lưu sẵn trên máy (không cần mạng/API key) —
       // hữu ích khi đang ngoài thực địa mất sóng, hoặc chỉ muốn mở lại xã vừa xem.
@@ -4635,21 +4963,31 @@
 
     function closeDriveModal() {
       document.getElementById('driveModalOverlay').classList.remove('show');
+      // Đóng khung mà chưa đăng nhập xong -> hủy luôn hồ sơ HSQ đang chờ mở (nếu
+      // có), tránh 1 lần đăng nhập KHÔNG LIÊN QUAN sau này vô tình tự mở lại nó.
+      pendingHsqAfterLogin = null;
     }
     function clearDriveSettings() {
       localStorage.removeItem(GDRIVE_FOLDER_STORAGE);
       localStorage.removeItem(GDRIVE_KEY_STORAGE);
       localStorage.removeItem('tdmap_prov_v1');
       localStorage.removeItem('tdmap_comm_v1');
-      document.getElementById('driveApiKeyInput').value = GDRIVE_DEFAULT_APIKEY;
+      driveLoggedIn = false;
+      driveLoggedName = '';
+      document.getElementById('driveApiKeyInput').value = '';
       document.getElementById('driveFolderInput').value = GDRIVE_DEFAULT_FOLDER;
       document.getElementById('driveProvinceInput').value = '';
       document.getElementById('driveCommuneInput').value = '';
       document.getElementById('driveCommuneCodeInput').value = '';
+      document.getElementById('driveUsernameInput').value = '';
+      document.getElementById('drivePasswordInput').value = '';
+      document.getElementById('driveLoginFields').style.display = '';
+      document.getElementById('driveLoggedInBox').style.display = 'none';
       document.getElementById('dlCommunes').innerHTML = '';
       document.getElementById('driveFileList').innerHTML = '';
       setDriveStatus('');
       updateDriveListBtnState();
+      setupGoogleEmailPicker();
       showStatus('Đã xóa thiết lập Google Drive đã lưu');
     }
     function setDriveStatus(msg, isError, isHtml = false) {
@@ -4676,11 +5014,12 @@
       const listEl = document.getElementById('driveFileList');
       listEl.innerHTML = '';
 
-      // Vì ô "Link thư mục Google Drive" đã ẩn khỏi giao diện, nút này chỉ chạy
-      // khi Tỉnh/Xã/API Key đã nhập đúng — sau đó tự dò thư mục tương ứng ngầm.
+      // Vì ô "Link thư mục Google Drive" và "Google API Key" đã ẩn khỏi giao diện,
+      // nút này chỉ chạy khi đã ĐĂNG NHẬP thành công (API Key thật được driveLogin()
+      // tự gán ngầm) — sau đó tự dò thư mục tương ứng ngầm.
       if (!provName || !provincesMap.has(provName)) { setDriveStatus('Vui lòng chọn đúng Tỉnh/Thành trong danh sách gợi ý.', true); return; }
       if (!commName || !communesMap.has(commName) || !commCode) { setDriveStatus('Vui lòng chọn đúng Xã/Phường trong danh sách gợi ý.', true); return; }
-      if (!apiKey) { setDriveStatus('Vui lòng nhập Google API Key (hoặc mã bí danh được cấp) — tạo miễn phí tại Google Cloud Console, bật "Google Drive API".', true); return; }
+      if (!driveLoggedIn || !apiKey) { setDriveStatus('Vui lòng đăng nhập trước khi tải danh sách file.', true); return; }
 
       listBtn.disabled = true;
 
