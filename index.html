@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TDMAP.PRO.VN-210826v2</title>
+  <title>TDMAP.PRO.VN-210826v3</title>
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server  -->
@@ -2281,18 +2281,8 @@
       if (!url || url === '#' || url.endsWith('#')) return;
       const parcelId = activeP ? activeP.id : null;
 
-      // Thửa ĐÃ ĐĂNG KÝ (DDK) đã có hồ sơ thật (CCCD, giấy chứng nhận...) trong
-      // thư mục HSQ -> bắt buộc đăng nhập tài khoản của xã (dùng chung khung
-      // đăng nhập ở "Mở file .geojson từ Google Drive") trước khi cho mở, để
-      // tránh lộ thông tin cá nhân cho người không có quyền. Thửa CHƯA đăng ký
-      // thì không cần (thư mục thường trống/chưa có giấy tờ nhạy cảm).
-      if (activeP && activeP.trangThaiDK === 'DDK' && !driveLoggedIn) {
-        pendingHsqAfterLogin = { url, parcelId };
-        showAlert('Thửa này đã đăng ký (DDK) — cần đăng nhập tài khoản của xã trước khi xem hồ sơ HSQ.\n\nVui lòng đăng nhập ở khung vừa mở, hồ sơ sẽ tự mở lại sau khi đăng nhập thành công.');
-        openDriveModal();
-        return;
-      }
-
+      // Thửa đã đăng ký (DDK) mở HSQ bình thường như thửa chưa đăng ký - không
+      // còn bắt đăng nhập tài khoản của xã trước khi xem nữa.
       showHsqGuide(url, parcelId, false);
     }
 
