@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>TDMAP.PRO.VN-210826v3</title>
+  <title>TDMAP.PRO.VN-220826</title>
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index.html (và manifest.json) trên server  -->
@@ -983,6 +983,32 @@
       border-color: #00c6a7;
     }
 
+    .drive-pass-wrap {
+      position: relative;
+    }
+
+    .drive-pass-wrap .drive-input {
+      padding-right: 34px;
+    }
+
+    .drive-pass-toggle {
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      color: #777;
+      padding: 4px 6px;
+    }
+
+    .drive-pass-toggle:hover {
+      color: #00c6a7;
+    }
+
     .drive-input:disabled,
     .drive-input[readonly] {
       background: #f5f5f5;
@@ -1151,79 +1177,35 @@
       position: fixed;
       inset: 0;
       z-index: 1000;
-      background: #ffffff;
+      background: rgba(255, 255, 255, 0.18);
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       gap: 14px;
+      /* Chỉ còn tiêu đề TDMAP.PRO.VN - việc "chọn Tỉnh/Xã để đăng nhập" nay dùng
+         luôn khung driveModalOverlay (tự mở khi tải trang, xem openDriveModal()
+         ở cuối script), không cần splash-card/icon nữa nên bỏ pointer-events để
+         không chặn thao tác trên khung đăng nhập đang nổi phía trên. */
+      pointer-events: none;
     }
 
     #splash .brand {
-      font-size: 13px;
+      position: absolute;
+      /* top mặc định (trước khi adjustTopLayout() tính lại chính xác theo chiều
+         cao thật của cụm nút HSQ + thanh tìm kiếm) - đặt đủ thấp để không đè lên
+         zoomBadge/HSQ (trái) và logoWrap (phải) ngay cả trên điện thoại hẹp. */
+      top: 130px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 26px;
       font-weight: 800;
       color: #00c6a7;
-      letter-spacing: 3px;
-    }
-
-    #splash .circle {
-      width: 76px;
-      height: 76px;
-      border-radius: 50%;
-      background: rgba(0, 198, 167, 0.12);
-      border: 2px solid #00c6a7;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 34px;
-      cursor: pointer;
-      transition: background .2s;
-    }
-
-    #splash .circle:active {
-      background: rgba(0, 198, 167, 0.25);
-    }
-
-    #splash .circle-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 30px;
-    }
-
-    #splash .circle-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
-
-    #splash .circle-label {
-      font-size: 12px;
-      font-weight: 700;
-      color: #666;
-    }
-
-    #splash .circle.drive {
-      border-color: #1a6fd4;
-      background: rgba(26, 111, 212, 0.1);
-    }
-
-    #splash .circle.drive:active {
-      background: rgba(26, 111, 212, 0.22);
-    }
-
-    #splash h2 {
-      font-size: 17px;
-      font-weight: 700;
-      color: #111;
-    }
-
-    #splash p {
-      font-size: 13px;
-      color: #555;
-      text-align: center;
-      padding: 0 36px;
-      line-height: 1.7;
+      letter-spacing: 4px;
+      background: #ffffff;
+      padding: 10px 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     }
 
     /* DROP OVERLAY */
@@ -1579,23 +1561,6 @@
 
   <div id="splash">
     <div class="brand">TDMAP.PRO.VN</div>
-    <div class="circle-row">
-      <div class="circle-item">
-        <div class="circle" onclick="document.getElementById('fileInput').click()">📂</div>
-        <span class="circle-label">Từ máy</span>
-      </div>
-      <div class="circle-item">
-        <div class="circle drive" onclick="openDriveModal()"><svg width="34" height="34" viewBox="0 0 100 100"
-            xmlns="http://www.w3.org/2000/svg">
-            <polygon points="50,6 6,88 50,60" fill="#2684FC" />
-            <polygon points="50,6 50,60 94,88" fill="#00AC47" />
-            <polygon points="6,88 94,88 50,60" fill="#FFBA00" />
-          </svg></div>
-        <span class="circle-label">Google Drive</span>
-      </div>
-    </div>
-    <h2>Tải file bản đồ lên</h2>
-    <p>Chọn file .kml hoặc .geojson xuất từ QGIS script TDMAP<br>để xem ranh thửa trên ảnh vệ tinh</p>
   </div>
 
   <div id="map"></div>
@@ -1800,7 +1765,7 @@
           <polygon points="50,6 6,88 50,60" fill="#2684FC" />
           <polygon points="50,6 50,60 94,88" fill="#00AC47" />
           <polygon points="6,88 94,88 50,60" fill="#FFBA00" />
-        </svg> Mở file .geojson từ Google Drive</div>
+        </svg> Chọn đơn vị hành chính</div>
       <div class="modal-body">
         <div style="display:flex; gap:10px;">
           <div style="flex:1;">
@@ -1837,16 +1802,18 @@
             </div>
             <div style="flex:1;">
               <div class="drive-field-label"><span>Mật khẩu</span></div>
-              <input class="drive-input" id="drivePasswordInput" type="password" placeholder="Mật khẩu"
-                autocomplete="current-password" oninput="updateDriveLoginBtnState()"
-                onkeydown="if(event.key==='Enter'){event.preventDefault();driveLogin();}">
+              <div class="drive-pass-wrap">
+                <input class="drive-input" id="drivePasswordInput" type="password" placeholder="Mật khẩu"
+                  autocomplete="current-password" oninput="updateDriveLoginBtnState()"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();driveLogin();}">
+                <button type="button" class="drive-pass-toggle" id="drivePassToggleBtn"
+                  onclick="toggleDrivePasswordVisibility()" title="Hiện mật khẩu" aria-label="Hiện mật khẩu">👁</button>
+              </div>
             </div>
           </div>
 
           <div class="drive-field-label"><span>Email đăng nhập (chọn tài khoản Google trên máy)</span></div>
           <div id="googleSignInBtn"></div>
-          <input class="drive-input" id="driveManualEmailInput" type="email" placeholder="Email của bạn"
-            style="display:none;" oninput="updateDriveLoginBtnState()">
           <div id="googleSignedEmailBox" style="display:none;">
             <span>✓ <b id="googleSignedEmailText"></b></span>
             <button type="button" onclick="clearGoogleSignIn()">Đổi</button>
@@ -2502,6 +2469,24 @@
       const belowSearchTop = Math.round(searchBarRect.bottom + 10);
       const labelZoomControl = document.getElementById('labelZoomControl');
       if (labelZoomControl) labelZoomControl.style.top = belowSearchTop + 'px';
+      // Tiêu đề "TDMAP.PRO.VN" trên màn hình splash: đặt NGAY DƯỚI thanh tìm kiếm
+      // (cùng mốc belowSearchTop) thay vì 1 giá trị top cố định - tránh chồng đè
+      // lên zoomBadge/nút HSQ (trái) và logoWrap (phải) trên điện thoại màn hình
+      // hẹp, nơi cụm nút trái có thể xuống dòng làm thanh tìm kiếm bị đẩy xuống.
+      const splashEl = document.getElementById('splash');
+      const splashBrand = document.querySelector('#splash .brand');
+      if (splashBrand) {
+        splashBrand.style.top = belowSearchTop + 'px';
+        // Khung "Tải file bản đồ lên" (splash-card) canh giữa màn hình theo chiều
+        // dọc (justify-content) độc lập với tiêu đề (vì tiêu đề position:absolute
+        // nằm ngoài luồng flex) -> trên điện thoại thấp, khung này có thể trồi lên
+        // đúng chỗ tiêu đề đang đứng. Đặt padding-top = đáy tiêu đề + khoảng cách,
+        // đẩy toàn bộ nội dung xuống dưới tiêu đề, không cần canh giữa nữa.
+        if (splashEl) {
+          const brandRect = splashBrand.getBoundingClientRect();
+          splashEl.style.paddingTop = Math.round(brandRect.bottom + 24) + 'px';
+        }
+      }
       // Lúc gọi lần đầu (ngay khi script chạy), bản đồ Leaflet + các control 🧭/📍/+/-
       // CHƯA được tạo (map khởi tạo ở đoạn code phía dưới) -> phần tử ".leaflet-top.
       // leaflet-right" chưa tồn tại trong DOM -> querySelector trả về null, bỏ qua an
@@ -2586,6 +2571,21 @@
     adjustTopLayout();
 
     map.setView([12.7, 108.2], 13);
+
+    // ── TỰ ĐỘNG ĐỊNH VỊ + HIỆN KHUNG "CHỌN TỈNH/XÃ ĐỂ ĐĂNG NHẬP" NGAY KHI MỞ APP ─────
+    // locateMe() (xin vị trí thiết bị, bay bản đồ tới đó - giống bấm nút 📍) và
+    // openDriveModal() (mở khung đăng nhập theo đơn vị hành chính, thay cho màn splash
+    // icon cũ) đều đụng tới các biến let/const KHAI BÁO Ở PHÍA DƯỚI trong cùng script
+    // này (vd: sTimer trong showStatus(), driveLoggedIn trong openDriveModal()) - gọi
+    // NGAY tại đây (giữa lúc file đang khởi tạo map) sẽ dính lỗi "Cannot access ...
+    // before initialization" (temporal dead zone) vì lúc này script CHƯA chạy tới chỗ
+    // khai báo các biến đó. setTimeout(...,0) đẩy 2 lệnh gọi này ra chạy NGAY SAU khi
+    // toàn bộ script đã chạy xong (mọi let/const đã khởi tạo đủ), tránh lỗi trên mà
+    // vẫn cảm giác "tức thì" với người dùng.
+    setTimeout(() => {
+      locateMe();
+      openDriveModal();
+    }, 0);
 
     // ── TẠM DỪNG TỰ-PAN KHI NGƯỜI DÙNG ĐANG CHẠM BẢN ĐỒ ─────────────────────────────
     // Khi chế độ 🧭 "Định vị khi di chuyển" đang bật, mỗi lần có toạ độ GPS mới bản
@@ -4433,6 +4433,11 @@
     // TDMAP sẽ ghi nhớ (localStorage) cho các lần mở sau.
     const GDRIVE_KEY_STORAGE = 'tdmap_gdrive_apikey_v1';
     const GDRIVE_FOLDER_STORAGE = 'tdmap_gdrive_folder_v1';
+    const GDRIVE_EMAIL_STORAGE = 'tdmap_gdrive_email_v1';
+    // Lưu Tên đăng nhập/Mật khẩu trên máy khi tick "Ghi nhớ" - theo yêu cầu của
+    // người dùng (đánh đổi bảo mật nếu máy dùng chung, xem driveLogin()/clearDriveSettings()).
+    const GDRIVE_USER_STORAGE = 'tdmap_gdrive_user_v1';
+    const GDRIVE_PASS_STORAGE = 'tdmap_gdrive_pass_v1';
     // KHÔNG gắn cứng API Key thật (dạng "AIzaSy...") vào code (file này có thể bị
     // đẩy lên kho GitHub công khai -> lộ key ngay lập tức, bị secret-scanning
     // quét ra). Thay vào đó dùng BÍ DANH NGẮN: người dùng chỉ cần dán mã ngắn
@@ -4483,8 +4488,9 @@
     // URL Web App của Google Apps Script (Deploy > New deployment > Web app,
     // "Execute as: Me", "Who has access: Anyone"), lấy URL kết thúc bằng "/exec".
     // Xem code mẫu + hướng dẫn triển khai trong file AppsScript_DangNhap.gs.txt
-    // (cùng thư mục dự án) - script đó đọc/ghi trực tiếp Google Sheet quản lý
-    // tài khoản theo xã: https://docs.google.com/spreadsheets/d/1gBwgYF9gjEGERPyVwRiJfnEinSGQA1nomoenqNtFLjQ/edit
+    // (cùng thư mục dự án, KHÔNG đưa file đó lên kho GitHub công khai) - script
+    // đó đọc/ghi trực tiếp Google Sheet quản lý tài khoản theo xã (ID sheet lưu
+    // riêng, không ghi trong code này để tránh lộ khi công khai mã nguồn).
     const DRIVE_AUTH_API_URL = 'https://script.google.com/macros/s/AKfycbylTmZaFGn5LlMoCHB8ZTFmGuI4ByFjgkoaOFqGy5sMTN4PNvCDWHVSzjYPU8C7MlaM/exec';
     let driveLoggedIn = false;
     let driveLoggedName = '';
@@ -4493,49 +4499,67 @@
     // Client ID lấy từ Google Cloud Console (xem GOOGLE_CLIENT_ID_WEB-TDMAP.txt
     // trong thư mục dự án) - PHẢI được thêm đúng domain đang chạy web này vào mục
     // "Authorized JavaScript origins" của Client ID đó trên Cloud Console thì nút
-    // chọn tài khoản Google mới hoạt động (không thêm được thì tự chuyển sang ô
-    // nhập email tay, xem showManualEmailFallback()).
+    // chọn tài khoản Google mới hoạt động (không thêm được thì báo lỗi và
+    // KHÔNG cho đăng nhập, xem showGoogleAuthError()).
     const GOOGLE_CLIENT_ID = '568799386764-gin8nn93so7v4f7m8s9cj00jc3303qq1.apps.googleusercontent.com';
     let googleIdToken = null; // JWT do Google cấp sau khi chọn tài khoản - gửi lên Apps Script để XÁC THỰC thật (không tin trực tiếp email phía trình duyệt)
     let googleSignedEmail = '';
+    let rememberedConfirmedEmail = ''; // email đã xác nhận ở lần mở trước, lấy từ localStorage - dùng khi không còn idToken (JWT) mới
 
-    // Chuẩn bị lại khu vực chọn email mỗi lần mở khung Drive (không giữ lựa chọn cũ giữa các lần).
+    // Chuẩn bị lại khu vực chọn email mỗi lần mở khung Drive. Nếu máy này đã từng
+    // xác nhận 1 tài khoản Google trước đó (lưu trong GDRIVE_EMAIL_STORAGE) thì
+    // hiển thị luôn email đó, KHÔNG bắt chọn lại tài khoản mỗi lần mở - người
+    // dùng chỉ cần bấm "Đổi" khi muốn chuyển sang tài khoản Google khác.
     async function setupGoogleEmailPicker() {
       googleIdToken = null;
       googleSignedEmail = '';
-      document.getElementById('googleSignedEmailBox').style.display = 'none';
-      const manual = document.getElementById('driveManualEmailInput');
-      manual.style.display = 'none';
-      manual.value = '';
       const btnEl = document.getElementById('googleSignInBtn');
+
+      const savedEmail = (localStorage.getItem(GDRIVE_EMAIL_STORAGE) || '').trim();
+      if (savedEmail) {
+        rememberedConfirmedEmail = savedEmail;
+        btnEl.style.display = 'none';
+        btnEl.innerHTML = '';
+        document.getElementById('googleSignedEmailText').textContent = savedEmail;
+        document.getElementById('googleSignedEmailBox').style.display = 'flex';
+        updateDriveLoginBtnState();
+        return;
+      }
+
+      rememberedConfirmedEmail = '';
+      document.getElementById('googleSignedEmailBox').style.display = 'none';
       btnEl.style.display = '';
       btnEl.innerHTML = '';
       updateDriveLoginBtnState();
 
       const loaded = await ensureGsiScriptLoaded();
       if (!loaded || !window.google || !google.accounts || !google.accounts.id) {
-        showManualEmailFallback();
+        showGoogleAuthError();
         return;
       }
       try {
         google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredentialResponse, auto_select: false });
         google.accounts.id.renderButton(btnEl, { theme: 'outline', size: 'large', text: 'signin_with', width: 260 });
       } catch (e) {
-        showManualEmailFallback();
+        showGoogleAuthError();
       }
     }
 
     // Không tải/hiện được nút chọn tài khoản Google (mất mạng, bị chặn, domain
-    // chưa được cấp phép...) -> vẫn cho tiếp tục đăng nhập bằng cách tự gõ email.
-    function showManualEmailFallback() {
+    // chưa được cấp phép...) -> KHÔNG cho gõ email tay thay thế (không xác thực
+    // được thì không cho đăng nhập, xem updateDriveLoginBtnState()/driveLogin()).
+    function showGoogleAuthError() {
       document.getElementById('googleSignInBtn').style.display = 'none';
-      document.getElementById('driveManualEmailInput').style.display = '';
-      setDriveStatus('Không lấy được danh sách tài khoản Google trên máy — vui lòng tự nhập email của bạn.', true);
+      setDriveStatus('Không xác thực được tài khoản Google trên máy này (mất mạng hoặc bị chặn) — vui lòng kiểm tra mạng rồi mở lại khung này để đăng nhập.', true);
     }
 
     function handleGoogleCredentialResponse(response) {
       googleIdToken = response.credential;
       googleSignedEmail = decodeJwtEmail(response.credential);
+      rememberedConfirmedEmail = googleSignedEmail;
+      // Ghi nhớ email đã xác nhận trên máy này -> lần mở khung Drive sau không
+      // bắt chọn lại tài khoản Google nữa (xem setupGoogleEmailPicker()).
+      try { if (googleSignedEmail) localStorage.setItem(GDRIVE_EMAIL_STORAGE, googleSignedEmail); } catch (e) { /* bỏ qua nếu bị chặn */ }
       document.getElementById('googleSignedEmailText').textContent = googleSignedEmail || '(đã chọn tài khoản)';
       document.getElementById('googleSignedEmailBox').style.display = 'flex';
       document.getElementById('googleSignInBtn').style.display = 'none';
@@ -4557,9 +4581,24 @@
     function clearGoogleSignIn() {
       googleIdToken = null;
       googleSignedEmail = '';
+      rememberedConfirmedEmail = '';
+      try { localStorage.removeItem(GDRIVE_EMAIL_STORAGE); } catch (e) { /* bỏ qua nếu bị chặn */ }
       document.getElementById('googleSignedEmailBox').style.display = 'none';
-      document.getElementById('googleSignInBtn').style.display = '';
       updateDriveLoginBtnState();
+      setupGoogleEmailPicker(); // bắt chọn lại tài khoản Google từ đầu
+    }
+
+    // Bật/tắt hiện mật khẩu đang gõ (để kiểm tra gõ đúng chưa) - chỉ đổi hiển thị
+    // trên trình duyệt của người dùng, không gửi/lưu gì thêm.
+    function toggleDrivePasswordVisibility() {
+      const input = document.getElementById('drivePasswordInput');
+      const btn = document.getElementById('drivePassToggleBtn');
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      btn.textContent = showing ? '👁' : '🙈';
+      btn.title = showing ? 'Hiện mật khẩu' : 'Ẩn mật khẩu';
+      btn.setAttribute('aria-label', btn.title);
+      input.focus();
     }
 
     function extractDriveFolderId(url) {
@@ -4635,11 +4674,10 @@
       const commOk = !!document.getElementById('driveCommuneCodeInput').value.trim();
       const uOk = !!document.getElementById('driveUsernameInput').value.trim();
       const pOk = !!document.getElementById('drivePasswordInput').value;
-      // Phải có email đăng nhập: hoặc đã chọn tài khoản Google (googleIdToken),
-      // hoặc đang ở chế độ dự phòng thì phải tự gõ email vào ô thay thế.
-      const manualEmail = document.getElementById('driveManualEmailInput');
-      const manualVisible = manualEmail && manualEmail.style.display !== 'none';
-      const emailOk = !!googleIdToken || (manualVisible && !!manualEmail.value.trim());
+      // Phải có email đăng nhập ĐÃ XÁC THỰC qua Google: hoặc vừa chọn tài khoản
+      // (googleIdToken), hoặc đã xác nhận từ lần trước và còn nhớ trên máy
+      // (rememberedConfirmedEmail). KHÔNG còn cho gõ tay email thay thế.
+      const emailOk = !!googleIdToken || !!rememberedConfirmedEmail;
       btn.disabled = !(provOk && commOk && uOk && pOk && emailOk);
     }
 
@@ -4733,13 +4771,13 @@
         setDriveStatus('Vui lòng nhập Tên đăng nhập và Mật khẩu.', true);
         return;
       }
-      const manualEmailInput = document.getElementById('driveManualEmailInput');
-      const manualEmailVisible = manualEmailInput.style.display !== 'none';
-      const manualEmail = manualEmailVisible ? manualEmailInput.value.trim() : '';
-      if (!googleIdToken && !manualEmail) {
-        setDriveStatus('Vui lòng chọn tài khoản Google (hoặc nhập email) để xác nhận email đăng nhập.', true);
+      // Bắt buộc phải có email ĐÃ XÁC THỰC qua Google (vừa chọn tài khoản, hoặc
+      // đã xác nhận từ lần trước còn nhớ trên máy) - không còn cho gõ tay.
+      if (!googleIdToken && !rememberedConfirmedEmail) {
+        setDriveStatus('Vui lòng chọn tài khoản Google để xác nhận email đăng nhập trước khi đăng nhập.', true);
         return;
       }
+      const manualEmail = googleIdToken ? '' : rememberedConfirmedEmail;
       if (!DRIVE_AUTH_API_URL || DRIVE_AUTH_API_URL.indexOf('DÁN_URL') !== -1) {
         setDriveStatus('Chưa cấu hình API đăng nhập (DRIVE_AUTH_API_URL) — xem hướng dẫn trong file AppsScript_DangNhap.gs.txt.', true);
         return;
@@ -4775,6 +4813,17 @@
         document.getElementById('driveLoggedName').textContent = driveLoggedName;
         document.getElementById('driveLoginFields').style.display = 'none';
         document.getElementById('driveLoggedInBox').style.display = 'flex';
+
+        // Ghi nhớ Tên đăng nhập/Mật khẩu trên máy khi đã tick "Ghi nhớ" (yêu cầu
+        // người dùng); nếu bỏ tick thì xóa mọi thông tin đã lưu trước đó.
+        if (document.getElementById('driveRememberChk').checked) {
+          localStorage.setItem(GDRIVE_USER_STORAGE, username);
+          localStorage.setItem(GDRIVE_PASS_STORAGE, password);
+        } else {
+          localStorage.removeItem(GDRIVE_USER_STORAGE);
+          localStorage.removeItem(GDRIVE_PASS_STORAGE);
+        }
+
         document.getElementById('drivePasswordInput').value = '';
         updateDriveListBtnState();
 
@@ -4874,14 +4923,18 @@
     }
 
     function openDriveModal() {
-      // Mỗi lần mở lại khung này đều bắt đăng nhập lại từ đầu (không lưu mật khẩu) -
-      // tránh để lộ dữ liệu xã khác nếu máy dùng chung.
+      // Mỗi lần mở lại khung này đều bắt đăng nhập lại từ đầu (nhưng nếu đã tick
+      // "Ghi nhớ" ở lần đăng nhập trước, tự điền sẵn Tên đăng nhập/Mật khẩu đã lưu
+      // trên máy - xem driveLogin()).
       driveLoggedIn = false;
       driveLoggedName = '';
       document.getElementById('driveApiKeyInput').value = '';
       document.getElementById('driveFolderInput').value = localStorage.getItem(GDRIVE_FOLDER_STORAGE) || GDRIVE_DEFAULT_FOLDER;
-      document.getElementById('driveUsernameInput').value = '';
-      document.getElementById('drivePasswordInput').value = '';
+      document.getElementById('driveUsernameInput').value = localStorage.getItem(GDRIVE_USER_STORAGE) || '';
+      document.getElementById('drivePasswordInput').value = localStorage.getItem(GDRIVE_PASS_STORAGE) || '';
+      document.getElementById('drivePasswordInput').type = 'password';
+      document.getElementById('drivePassToggleBtn').textContent = '👁';
+      document.getElementById('drivePassToggleBtn').title = 'Hiện mật khẩu';
       document.getElementById('driveLoginFields').style.display = '';
       document.getElementById('driveLoggedInBox').style.display = 'none';
       document.getElementById('driveFileList').innerHTML = '';
@@ -4962,6 +5015,10 @@
       localStorage.removeItem(GDRIVE_KEY_STORAGE);
       localStorage.removeItem('tdmap_prov_v1');
       localStorage.removeItem('tdmap_comm_v1');
+      localStorage.removeItem(GDRIVE_EMAIL_STORAGE);
+      localStorage.removeItem(GDRIVE_USER_STORAGE);
+      localStorage.removeItem(GDRIVE_PASS_STORAGE);
+      rememberedConfirmedEmail = '';
       driveLoggedIn = false;
       driveLoggedName = '';
       document.getElementById('driveApiKeyInput').value = '';
