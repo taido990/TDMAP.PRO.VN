@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>TDMAP.PRO.VN-KH113</title>
-  <!-- 220926  -->
+  <!-- 220926 -->
 
   <!-- ICON HIỂN THỊ TRÊN TAB TRÌNH DUYỆT + KHI TẠO PHÍM TẮT NGOÀI MÀN HÌNH ĐIỆN THOẠI  -->
   <!-- Đặt file app-icon.ico cùng thư mục với index_KH113.html (và manifest.json) trên server  -->
@@ -3831,6 +3831,9 @@
             // Thửa khớp: viền cyan; nền giữ màu loại đất (DGT/SON/DTL) nếu có, còn lại cyan 0.2 như cũ.
             p._poly.setStyle(Object.assign({ color: '#00ffcc' },
               getLandTypeFillColor(p) ? getParcelFillStyle(p) : { fillColor: '#00ffcc', fillOpacity: 0.2 }));
+          } else if (getLandTypeFillColor(p)) {
+            // Thửa không khớp nhưng có loại đất DGT/SON/DTL -> KHÔNG làm mờ, giữ nguyên màu nền loại đất.
+            p._poly.setStyle(getParcelNormalStyle(p));
           } else {
             p._poly.setStyle({ color: getParcelDimColor(p), fillColor: getParcelDimColor(p), fillOpacity: 0.02 });
           }
